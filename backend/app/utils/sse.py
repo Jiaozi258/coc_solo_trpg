@@ -14,3 +14,13 @@ async def sse_stream(generator) -> AsyncGenerator[str, None]:
             yield sse_event("done", payload)
             return
         yield sse_event(event_type, payload)
+
+
+def estimate_tokens(text_or_chars) -> int:
+    """Rough token estimation: ~2 chars per token for CJK, ~4 for English."""
+    if isinstance(text_or_chars, int):
+        return max(1, text_or_chars // 2)
+    text = str(text_or_chars)
+    cjk = sum(1 for c in text if '一' <= c <= '鿿' or '㐀' <= c <= '䶿')
+    other = len(text) - cjk
+    return max(1, cjk // 2 + other // 4)

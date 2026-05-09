@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createCharacter, listCharacters, deleteCharacter, updateCharacter } from '../api/client'
-import { COC_OCCUPATIONS, COC_SKILL_LIST } from '../types'
+import { COC_OCCUPATIONS, COC_SKILL_LIST, COC_SKILL_BASE, COC_SKILL_ATTR_BASE, SOCIAL_SKILLS } from '../types'
 import type { Character, Attributes } from '../types'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const ATTR_NAMES = ['STR', 'CON', 'SIZ', 'DEX', 'INT', 'APP', 'POW', 'EDU'] as const
 type AttrName = typeof ATTR_NAMES[number]
@@ -28,6 +29,8 @@ export default function CharacterPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [jobSkillPoints, setJobSkillPoints] = useState(0)
   const [interestSkillPoints, setInterestSkillPoints] = useState(0)
+  const [confirmState, setConfirmState] = useState<{ open: boolean; charId: string; charName: string }>({ open: false, charId: '', charName: '' })
+  const [errorMsg, setErrorMsg] = useState('')
 
   const loadCharacters = async () => {
     try {
@@ -63,37 +66,104 @@ export default function CharacterPage() {
     setAttrs({ ...attrs, [name]: Math.max(0, Math.min(99, value)) })
   }
 
+  const [socialSkillChoice, setSocialSkillChoice] = useState('')
+  const [interestSkillsAlloc, setInterestSkillsAlloc] = useState<Record<string, number>>({})
+
+  // Compute base value for a skill given current attributes
+  const getSkillBase = (skillName: string): number => {
+    if (COC_SKILL_ATTR_BASE[skillName]) {
+      const attrName = COC_SKILL_ATTR_BASE[skillName][0] as AttrName
+      return attrs[attrName] ?? COC_SKILL_BASE[skillName] ?? 0
+    }
+    return COC_SKILL_BASE[skillName] ?? 0
+  }
+
   const handleOccupationSelect = (occName: string) => {
     setOccupation(occName)
+    setSocialSkillChoice('')
     const occ = COC_OCCUPATIONS.find(o => o.name === occName)
     if (occ) {
       const baseSkills: Record<string, number> = {}
-      occ.skills.forEach(s => { baseSkills[s] = 0 })
+      occ.skills.forEach(s => {
+        if (s === '一项社交技能') {
+          // Will be resolved when user picks the social skill
+          baseSkills['__social_skill_placeholder__'] = 0
+        } else {
+          baseSkills[s] = getSkillBase(s)
+        }
+      })
       setSkills(baseSkills)
     }
     const edu = attrs.EDU
-    const basePoints = edu * 4
-    setJobSkillPoints(basePoints)
+    setJobSkillPoints(edu * 4)
     const intPoints = attrs.INT * 2
     setInterestSkillPoints(intPoints)
+    setInterestSkillsAlloc({})
   }
 
+  // Compute total allocated to job skills (value - base)
+  const jobPointsSpent = Object.entries(skills).reduce((sum, [k, v]) => {
+    if (k === '__social_skill_placeholder__') return sum
+    return sum + Math.max(0, v - getSkillBase(k))
+  }, 0)
+  const jobPointsRemaining = jobSkillPoints - jobPointsSpent
+
   const setJobSkill = (skillName: string, value: number) => {
-    const newSkills = { ...skills, [skillName]: Math.max(0, Math.min(99, value)) }
-    const totalSpent = Object.entries(newSkills).reduce((sum, [k, v]) => {
-      return sum + v
-    }, 0)
-    if (totalSpent <= jobSkillPoints) {
-      setSkills(newSkills)
+    const clamped = Math.max(0, Math.min(99, value))
+    const base = getSkillBase(skillName)
+    const extra = Math.max(0, clamped - base)
+    const oldExtra = Math.max(0, (skills[skillName] || 0) - base)
+    const delta = extra - oldExtra
+
+    if (delta > 0 && delta > jobPointsRemaining) return // not enough points
+
+    const newSkills = { ...skills, [skillName]: clamped }
+    setSkills(newSkills)
+  }
+
+  const resolveSkills = (): Record<string, number> => {
+    const resolved: Record<string, number> = {}
+    for (const [k, v] of Object.entries(skills)) {
+      if (k === '__social_skill_placeholder__') {
+        if (socialSkillChoice) {
+          resolved[socialSkillChoice] = getSkillBase(socialSkillChoice) + v
+        }
+      } else {
+        resolved[k] = v
+      }
     }
+    // Merge interest skills with allocations
+    for (const [k, v] of Object.entries(interestSkillsAlloc)) {
+      resolved[k] = getSkillBase(k) + v
+    }
+    return resolved
+  }
+
+  // Interest skill allocation
+  const interestPointsSpent = Object.values(interestSkillsAlloc).reduce((s, v) => s + v, 0)
+  const interestPointsRemaining = interestSkillPoints - interestPointsSpent
+
+  const addInterestSkill = (skillName: string) => {
+    if (!skillName || skillName in interestSkillsAlloc) return
+    setInterestSkillsAlloc({ ...interestSkillsAlloc, [skillName]: 0 })
+  }
+
+  const setInterestSkillPoints2 = (skillName: string, points: number) => {
+    const clamped = Math.max(0, Math.min(99 - getSkillBase(skillName), points))
+    const old = interestSkillsAlloc[skillName] || 0
+    const delta = clamped - old
+    if (delta > 0 && delta > interestPointsRemaining) return
+    setInterestSkillsAlloc({ ...interestSkillsAlloc, [skillName]: clamped })
+  }
+
+  const removeInterestSkill = (skillName: string) => {
+    const next = { ...interestSkillsAlloc }
+    delete next[skillName]
+    setInterestSkillsAlloc(next)
   }
 
   const handleSave = async () => {
-    // Merge interest skills into the skills dict (default 20 each)
-    const allSkills = { ...skills }
-    interestSkills.filter(s => s).forEach(s => {
-      if (!(s in allSkills)) allSkills[s] = 20
-    })
+    const allSkills = resolveSkills()
 
     const data = {
       name,
@@ -113,16 +183,15 @@ export default function CharacterPage() {
       setEditingId(null)
       loadCharacters()
     } catch (err: any) {
-      alert('保存失败: ' + (err.response?.data?.detail || err.message))
+      setErrorMsg('保存失败: ' + (err.response?.data?.detail || err.message))
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这个调查员吗？')) return
     try {
       await deleteCharacter(id)
       loadCharacters()
-    } catch (err: any) { alert('删除失败: ' + err.message) }
+    } catch (err: any) { setErrorMsg('删除失败: ' + err.message) }
   }
 
   const startEdit = (char: Character) => {
@@ -134,6 +203,23 @@ export default function CharacterPage() {
     setLuck(a.LUCK)
     setSkills(char.skills || {})
     setBg(char.background || { residence: '', history: '', beliefs: '', important_persons: '', appearance: '' })
+    // Recalculate skill point budgets from saved attributes
+    setJobSkillPoints((a.EDU || 0) * 4)
+    setInterestSkillPoints((a.INT || 0) * 2)
+    // Restore interest skills from saved data (any skill with points above base that isn't an occupation skill)
+    const occ = COC_OCCUPATIONS.find(o => o.name === char.occupation)
+    const occSkills = occ ? occ.skills.filter(s => s !== '一项社交技能') : []
+    const interestAlloc: Record<string, number> = {}
+    if (char.skills) {
+      for (const [k, v] of Object.entries(char.skills)) {
+        if (!occSkills.includes(k)) {
+          const base = COC_SKILL_BASE[k] ?? 0
+          if (v > base) interestAlloc[k] = v
+        }
+      }
+    }
+    setInterestSkillsAlloc(interestAlloc)
+    setSocialSkillChoice('')
     setStep('attributes')
   }
 
@@ -187,11 +273,31 @@ export default function CharacterPage() {
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => startEdit(c)} className="parchment-btn text-xs">编辑</button>
-                    <button onClick={() => handleDelete(c.id)} className="parchment-btn text-xs text-cthulhu-blood">删除</button>
+                    <button onClick={() => setConfirmState({ open: true, charId: c.id, charName: c.name })} className="parchment-btn text-xs text-cthulhu-blood">删除</button>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        <ConfirmDialog
+          open={confirmState.open}
+          title="删除调查员"
+          message={`确定要删除「${confirmState.charName}」吗？此操作不可撤销。`}
+          confirmLabel="删除"
+          danger
+          onConfirm={() => {
+            handleDelete(confirmState.charId)
+            setConfirmState({ open: false, charId: '', charName: '' })
+          }}
+          onCancel={() => setConfirmState({ open: false, charId: '', charName: '' })}
+        />
+        {errorMsg && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
+            <div className="w-full max-w-xs mx-4 p-5 rounded space-y-4" style={{ background: 'var(--color-ash-black)', border: '1px solid rgba(154,42,42,0.4)' }}>
+              <p className="text-sm text-ash-red font-mono text-center">{errorMsg}</p>
+              <button onClick={() => setErrorMsg('')} className="ash-btn text-xs w-full">关闭</button>
+            </div>
           </div>
         )}
       </div>
@@ -262,6 +368,8 @@ export default function CharacterPage() {
   // --- Step 2: Skills ---
   if (step === 'skills') {
     const occ = COC_OCCUPATIONS.find(o => o.name === occupation)
+    const hasSocialPlaceholder = '__social_skill_placeholder__' in skills
+
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h2 className="text-2xl font-display text-cthulhu-gold horror-text mb-6">步骤 2/3: 职业与技能</h2>
@@ -281,46 +389,137 @@ export default function CharacterPage() {
           </select>
           {occ && (
             <div className="mt-2 text-xs text-parchment-400">
-              职业技能: {occ.skills.join('、')} | 技能点: {jobSkillPoints} (EDU×4) | 兴趣技能点: {interestSkillPoints} (INT×2)
+              职业技能: {occ.skills.map(s => s === '一项社交技能' ? (socialSkillChoice || '未选择社交技能') : s).join('、')}
             </div>
           )}
         </div>
 
         {occupation && (
           <>
+            {/* Skill points summary */}
             <div className="parchment-card mb-4">
-              <h3 className="font-display text-cthulhu-gold mb-2">职业技能</h3>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {Object.entries(skills).map(([skillName, value]) => (
-                  <div key={skillName} className="flex items-center gap-3">
-                    <span className="text-sm text-parchment-300 w-28">{skillName}</span>
-                    <input type="range" min={0} max={99} value={value}
-                           onChange={e => setJobSkill(skillName, Number(e.target.value))}
-                           className="flex-1 accent-cthulhu-gold" />
-                    <input type="number" value={value}
-                           onChange={e => setJobSkill(skillName, Number(e.target.value))}
-                           className="parchment-input w-16 text-center text-xs" />
-                  </div>
-                ))}
+              <div className="flex gap-6 text-sm">
+                <div>
+                  <span className="text-parchment-400">职业技能点:</span>{' '}
+                  <span className="text-cthulhu-gold font-bold">{jobPointsRemaining}</span>
+                  <span className="text-parchment-500"> / {jobSkillPoints} (EDU×4)</span>
+                  {jobPointsRemaining < 0 && <span className="text-red-400 ml-1">超额!</span>}
+                </div>
+                <div>
+                  <span className="text-parchment-400">兴趣技能点:</span>{' '}
+                  <span className="text-cthulhu-gold font-bold">{interestPointsRemaining}</span>
+                  <span className="text-parchment-500"> / {interestSkillPoints} (INT×2)</span>
+                </div>
               </div>
             </div>
 
-            <div className="parchment-card mb-4">
-              <h3 className="font-display text-cthulhu-gold mb-2">兴趣技能 (选择 3 个)</h3>
-              <div className="space-y-2">
-                {interestSkills.map((sk, idx) => (
-                  <select key={idx} value={sk} onChange={e => {
-                    const next = [...interestSkills]
-                    next[idx] = e.target.value
-                    setInterestSkills(next)
-                  }} className="parchment-input">
-                    <option value="">选择兴趣技能 {idx + 1}...</option>
-                    {COC_SKILL_LIST.filter(s => !(s in skills) || s === sk).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                ))}
+            {/* Social skill selector */}
+            {hasSocialPlaceholder && (
+              <div className="parchment-card mb-4">
+                <label className="text-sm text-parchment-400 mb-1 block">一项社交技能 — 请选择</label>
+                <select
+                  value={socialSkillChoice}
+                  onChange={e => setSocialSkillChoice(e.target.value)}
+                  className="parchment-input w-full"
+                >
+                  <option value="">选择一项社交技能...</option>
+                  {SOCIAL_SKILLS.map(s => (
+                    <option key={s} value={s}>
+                      {s} (基础值: {getSkillBase(s)}%)
+                    </option>
+                  ))}
+                </select>
               </div>
+            )}
+
+            {/* Job skills */}
+            <div className="parchment-card mb-4">
+              <h3 className="font-display text-cthulhu-gold mb-2">职业技能</h3>
+              <p className="text-xs text-parchment-500 mb-3">
+                每个技能显示为 基础值 + 分配点数。职业技能点只能加到职业技能上。
+              </p>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {Object.entries(skills).map(([skillName, value]) => {
+                  if (skillName === '__social_skill_placeholder__') return null
+                  const base = getSkillBase(skillName)
+                  const extra = Math.max(0, value - base)
+                  return (
+                    <div key={skillName} className="flex items-center gap-3">
+                      <span className="text-sm text-parchment-300 w-28 truncate" title={skillName}>
+                        {skillName}
+                      </span>
+                      <span className="text-[0.6rem] text-parchment-500 w-8 text-right">{base}%</span>
+                      <span className="text-[0.6rem] text-cthulhu-gold">+{extra}</span>
+                      <input type="range" min={base} max={99} value={value}
+                             onChange={e => setJobSkill(skillName, Number(e.target.value))}
+                             className="flex-1 accent-cthulhu-gold" />
+                      <input type="number" value={value}
+                             onChange={e => setJobSkill(skillName, Number(e.target.value))}
+                             className="parchment-input w-16 text-center text-xs" />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Interest skills */}
+            <div className="parchment-card mb-4">
+              <h3 className="font-display text-cthulhu-gold mb-2">
+                兴趣技能
+                <span className="text-xs text-parchment-400 ml-2">
+                  (剩余点数: {interestPointsRemaining})
+                </span>
+              </h3>
+              <p className="text-xs text-parchment-500 mb-3">
+                选择技能后分配点数，每个技能获得 基础值 + 分配点数。
+              </p>
+
+              {/* Add interest skill */}
+              <div className="mb-3">
+                <select
+                  value=""
+                  onChange={e => addInterestSkill(e.target.value)}
+                  className="parchment-input w-full"
+                >
+                  <option value="">+ 添加兴趣技能...</option>
+                  {COC_SKILL_LIST.filter(s => !(s in skills) && !(s in interestSkillsAlloc)).map(s => (
+                    <option key={s} value={s}>
+                      {s} (基础: {getSkillBase(s)}%)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Interest skill allocators */}
+              {Object.keys(interestSkillsAlloc).length > 0 && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {Object.entries(interestSkillsAlloc).map(([skillName, points]) => {
+                    const base = getSkillBase(skillName)
+                    return (
+                      <div key={skillName} className="flex items-center gap-3">
+                        <button
+                          onClick={() => removeInterestSkill(skillName)}
+                          className="text-xs text-ash-red hover:text-ash-red-bright w-5"
+                          title="移除"
+                        >
+                          ×
+                        </button>
+                        <span className="text-sm text-parchment-300 w-24 truncate" title={skillName}>
+                          {skillName}
+                        </span>
+                        <span className="text-[0.6rem] text-parchment-500 w-8 text-right">{base}%</span>
+                        <span className="text-[0.6rem] text-blue-400">+{points}</span>
+                        <input type="range" min={0} max={Math.min(99 - base, points + interestPointsRemaining)} value={points}
+                               onChange={e => setInterestSkillPoints2(skillName, Number(e.target.value))}
+                               className="flex-1 accent-blue-400" />
+                        <input type="number" value={points}
+                               onChange={e => setInterestSkillPoints2(skillName, Number(e.target.value))}
+                               className="parchment-input w-16 text-center text-xs" />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </>
         )}

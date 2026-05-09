@@ -1,22 +1,39 @@
 import { useCallback, useState } from 'react'
-import type { DiceRequest, DiceResult } from '../types'
+import type { DiceRequest, DiceResult, DiceCheckResult } from '../types'
+
+function resolveD100(total: number, skillValue: number): DiceCheckResult | null {
+  if (skillValue <= 0) return null
+  if (total === 1) return { success: true, level: 'critical', label: '大成功' }
+  if (total <= Math.floor(skillValue / 5)) return { success: true, level: 'extreme', label: '极难成功' }
+  if (total <= Math.floor(skillValue / 2)) return { success: true, level: 'hard', label: '困难成功' }
+  if (total <= skillValue) return { success: true, level: 'regular', label: '成功' }
+  if (skillValue >= 50 && total === 100) return { success: false, level: 'fumble', label: '大失败' }
+  if (skillValue < 50 && total >= 96) return { success: false, level: 'fumble', label: '大失败' }
+  return { success: false, level: 'failure', label: '失败' }
+}
 
 export function useDice() {
   const [rolling, setRolling] = useState(false)
   const [result, setResult] = useState<DiceResult | null>(null)
+  const [check, setCheck] = useState<DiceCheckResult | null>(null)
 
   const roll = useCallback((request: DiceRequest): DiceResult => {
     setRolling(true)
     setResult(null)
+    setCheck(null)
 
     let expression = '1d100'
     if (request.type === 'damage' && request.expression) {
       expression = request.expression
     }
 
-    // Parse and execute dice roll locally (frontend generates the random numbers)
-    // The backend validates and resolves the outcome
-    const parts = expression.matchAll(/(\d+)d(\d+)/g)
+    // Normalize: uppercase D, handle missing leading digit (d6 → 1d6)
+    expression = expression.replace(/(\d+)?[dD](\d+)/g, (_, count, faces) => {
+      return `${count || 1}d${faces}`
+    })
+
+    // Parse and execute dice roll locally
+    const parts = expression.matchAll(/(\d+)d(\d+)/gi)
     const individual: number[] = []
     let total = 0
 
@@ -30,8 +47,8 @@ export function useDice() {
       }
     }
 
-    // Add flat modifiers (e.g., "1d10+2", "1d6-1")
-    const modifierMatch = expression.match(/([+-]\d+)(?!d)/g)
+    // Add flat modifiers (e.g., "1d10+2", "1d6-1", "1d6+3d4+2")
+    const modifierMatch = expression.match(/(?<![dD])([+-]\d+)(?![dD])/g)
     if (modifierMatch) {
       for (const mod of modifierMatch) {
         total += parseInt(mod)
@@ -41,9 +58,14 @@ export function useDice() {
     const diceResult: DiceResult = { expression, individual, total }
     setResult(diceResult)
 
+    // Resolve skill check result for d100 rolls
+    if (request.type === 'skill_check' && request.value != null) {
+      setCheck(resolveD100(total, request.value))
+    }
+
     setTimeout(() => setRolling(false), 1200)
     return diceResult
   }, [])
 
-  return { roll, rolling, result, setResult }
+  return { roll, rolling, result, check, setResult }
 }

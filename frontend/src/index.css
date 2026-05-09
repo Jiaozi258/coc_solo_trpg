@@ -1,93 +1,501 @@
-@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Cinzel:wght@400;600;700;900&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-parchment-50: #fdf8f0;
-  --color-parchment-100: #f9edda;
-  --color-parchment-200: #f2d9a8;
-  --color-parchment-300: #e8bf70;
-  --color-parchment-400: #dca248;
-  --color-parchment-500: #c9882e;
-  --color-parchment-600: #a66b24;
-  --color-parchment-700: #855020;
-  --color-parchment-800: #6e4121;
-  --color-parchment-900: #5c3720;
-  --color-parchment-950: #331b0e;
-  --color-cthulhu-green: #1a3a2a;
-  --color-cthulhu-dark: #0d1117;
-  --color-cthulhu-blood: #8b0000;
-  --color-cthulhu-gold: #c9a84c;
-  --font-display: 'IM Fell English', serif;
+  /* Arkham Stronghold palette */
+  --color-ash-black: #161311;
+  --color-ash-card: #1E1A17;
+  --color-ash-border: #2A2420;
+  --color-ash-gold: #C5A566;
+  --color-ash-gold-dim: #8B7340;
+  --color-ash-gold-pale: #D4C9A8;
+  --color-ash-parchment: #E0DCD3;
+  --color-ash-parchment-dim: #BDBAB3;
+  --color-ash-red: #9A2A2A;
+  --color-ash-red-dark: #3D1010;
+  --color-ash-red-bright: #C0392B;
+
+  /* Fonts */
+  --font-gothic: 'UnifrakturMaguntia', serif;
+  --font-display: 'Cinzel', serif;
   --font-body: 'Crimson Text', serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
+/* ── Base ── */
 body {
-  @apply bg-parchment-950 text-parchment-100;
+  background-color: var(--color-ash-black);
+  color: var(--color-ash-parchment);
   font-family: var(--font-body);
-  background-image:
-    radial-gradient(ellipse at 20% 50%, rgba(139, 0, 0, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(201, 168, 76, 0.05) 0%, transparent 50%);
   min-height: 100vh;
+  /* Subtle vertical stripe noise via repeating gradient */
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.004) 2px,
+      rgba(255, 255, 255, 0.004) 4px
+    );
 }
 
+/* ── Card base ── */
+.ash-card {
+  background: var(--color-ash-card);
+  border: 1px solid var(--color-ash-border);
+  border-radius: 2px;
+}
+.ash-card-gold {
+  background: var(--color-ash-card);
+  border: 1px solid rgba(197, 165, 102, 0.25);
+  border-radius: 2px;
+}
+
+/* ── Gold section title ── */
+.ash-section-title {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--color-ash-gold);
+  text-transform: uppercase;
+}
+
+/* ── Gothic header text ── */
+.gothic-title {
+  font-family: var(--font-gothic);
+  color: var(--color-ash-gold);
+  letter-spacing: 0.05em;
+}
+
+/* ── Gold text glow ── */
+.text-gold-glow {
+  text-shadow: 0 0 12px rgba(197, 165, 102, 0.3);
+}
+
+/* ── Buttons ── */
+.ash-btn {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ash-parchment-dim);
+  background: transparent;
+  border: 1px solid rgba(197, 165, 102, 0.2);
+  padding: 4px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ash-btn:hover {
+  color: var(--color-ash-gold);
+  border-color: rgba(197, 165, 102, 0.5);
+  background: rgba(197, 165, 102, 0.06);
+  text-shadow: 0 0 8px rgba(197, 165, 102, 0.2);
+}
+.ash-btn-active {
+  color: var(--color-ash-gold);
+  border-color: rgba(197, 165, 102, 0.45);
+  background: rgba(197, 165, 102, 0.08);
+}
+
+/* ── Gold border container ── */
+.ash-border-box {
+  border: 1px solid rgba(197, 165, 102, 0.2);
+  background: rgba(30, 26, 23, 0.6);
+  border-radius: 2px;
+}
+
+/* ── Progress bar (HP/SAN/MP) ── */
+.ash-progress-bg {
+  background: var(--color-ash-red-dark);
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ash-progress-fill {
+  background: var(--color-ash-red);
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* ── Resource stat card ── */
+.ash-stat-card {
+  background: var(--color-ash-card);
+  border: 1px solid var(--color-ash-border);
+  border-radius: 2px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: border-color 0.2s;
+}
+.ash-stat-card:hover {
+  border-color: rgba(197, 165, 102, 0.25);
+}
+
+/* ── Difficulty badges ── */
+.badge-high {
+  color: var(--color-ash-red);
+  border: 1px solid rgba(154, 42, 42, 0.6);
+  font-size: 0.6rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.badge-medium {
+  color: var(--color-ash-gold);
+  border: 1px solid rgba(197, 165, 102, 0.5);
+  font-size: 0.6rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.badge-low {
+  color: var(--color-ash-parchment-dim);
+  border: 1px solid rgba(189, 186, 179, 0.4);
+  font-size: 0.6rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--color-ash-black); }
+::-webkit-scrollbar-thumb {
+  background: rgba(197, 165, 102, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(197, 165, 102, 0.35); }
+
+/* ── Animations ── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes pulse-gold {
+  0%, 100% { border-color: rgba(197, 165, 102, 0.2); }
+  50% { border-color: rgba(197, 165, 102, 0.4); }
+}
+@keyframes typewriter-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes staggerFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUpIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(40px); }
+}
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Slide-out panel ── */
+.slide-panel {
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* ── Stagger animation for lists ── */
+.stagger-item {
+  opacity: 0;
+  animation: staggerFadeIn 0.35s ease-out forwards;
+}
+.stagger-delay-1 { animation-delay: 0.05s; }
+.stagger-delay-2 { animation-delay: 0.10s; }
+.stagger-delay-3 { animation-delay: 0.15s; }
+.stagger-delay-4 { animation-delay: 0.20s; }
+.stagger-delay-5 { animation-delay: 0.25s; }
+.stagger-delay-6 { animation-delay: 0.30s; }
+
+/* ── Expand/collapse transition helper ── */
+.expand-enter {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.35s ease;
+}
+.expand-enter.open {
+  max-height: 2000px;
+  opacity: 1;
+}
+
+/* ── Skeleton loading ── */
+.skeleton {
+  background: linear-gradient(90deg, rgba(197,165,102,0.06) 25%, rgba(197,165,102,0.12) 50%, rgba(197,165,102,0.06) 75%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.8s ease-in-out infinite;
+  border-radius: 2px;
+}
+
+/* ── Toast notification ── */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast-item {
+  padding: 10px 18px;
+  border-radius: 2px;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  animation: toastIn 0.3s ease-out;
+  min-width: 200px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+.toast-item.removing {
+  animation: toastOut 0.25s ease-in forwards;
+}
+.toast-success {
+  background: rgba(30,40,25,0.95);
+  border: 1px solid rgba(197,165,102,0.3);
+  color: var(--color-ash-gold);
+}
+.toast-error {
+  background: rgba(40,20,20,0.95);
+  border: 1px solid rgba(154,42,42,0.3);
+  color: var(--color-ash-red-bright);
+}
+
+/* ── Custom styled select ── */
+.ash-select-wrapper {
+  position: relative;
+  cursor: pointer;
+}
+.ash-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: rgba(30, 26, 23, 0.8);
+  border: 1px solid rgba(197, 165, 102, 0.2);
+  color: var(--color-ash-parchment);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.ash-select-trigger:hover {
+  border-color: rgba(197, 165, 102, 0.4);
+}
+.ash-select-trigger.open {
+  border-color: rgba(197, 165, 102, 0.5);
+}
+.ash-select-caret {
+  font-size: 0.6rem;
+  color: var(--color-ash-gold-dim);
+  transition: transform 0.2s ease;
+  margin-left: 8px;
+}
+.ash-select-caret.open {
+  transform: rotate(180deg);
+}
+.ash-select-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--color-ash-card);
+  border: 1px solid rgba(197, 165, 102, 0.2);
+  border-radius: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  animation: staggerFadeIn 0.2s ease-out;
+}
+.ash-select-option {
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--color-ash-parchment-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ash-select-option:hover {
+  color: var(--color-ash-gold);
+  background: rgba(197, 165, 102, 0.08);
+}
+.ash-select-option.selected,
+.ash-select-option.focused {
+  color: var(--color-ash-gold);
+  background: rgba(197, 165, 102, 0.06);
+}
+
+/* ── Map grid cell ── */
+.map-grid-cell {
+  border: 1px solid rgba(197, 165, 102, 0.08);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.map-grid-cell:hover {
+  border-color: rgba(197, 165, 102, 0.3);
+  background: rgba(197, 165, 102, 0.05);
+}
+
+/* ── Quest marker pulse ── */
+.quest-marker {
+  animation: pulse-gold 2s infinite;
+}
+
+/* ── Dialogue text area ── */
+.dialogue-area {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--color-ash-parchment);
+}
+
+/* ── Option button ── */
+.option-btn {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--color-ash-parchment-dim);
+  background: rgba(30, 26, 23, 0.8);
+  border: 1px solid rgba(197, 165, 102, 0.15);
+  padding: 10px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+.option-btn:hover {
+  color: var(--color-ash-parchment);
+  border-color: rgba(197, 165, 102, 0.4);
+  background: rgba(197, 165, 102, 0.06);
+}
+
+/* ── Input ── */
+.ash-input {
+  background: rgba(30, 26, 23, 0.8);
+  border: 1px solid rgba(197, 165, 102, 0.2);
+  color: var(--color-ash-parchment);
+  font-family: var(--font-body);
+  padding: 8px 12px;
+  border-radius: 2px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ash-input:focus {
+  border-color: rgba(197, 165, 102, 0.5);
+}
+.ash-input::placeholder {
+  color: rgba(197, 165, 102, 0.3);
+}
+
+/* ── Divider ── */
+.ash-divider {
+  border: none;
+  border-top: 1px solid rgba(197, 165, 102, 0.1);
+  margin: 0;
+}
+
+/* ── Backward-compat aliases for old parchment class names ── */
 .parchment-card {
-  @apply bg-parchment-900/80 border border-parchment-700/30 rounded-lg p-4;
+  background: var(--color-ash-card);
+  border: 1px solid var(--color-ash-border);
+  border-radius: 2px;
+  padding: 1rem;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
-
 .parchment-btn {
-  @apply px-4 py-2 rounded border cursor-pointer;
-  border-color: rgba(201, 168, 76, 0.4);
-  background: rgba(110, 65, 33, 0.6);
-  color: var(--color-parchment-200);
   font-family: var(--font-display);
-  font-size: 0.875rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ash-parchment-dim);
+  background: rgba(110, 65, 33, 0.3);
+  border: 1px solid rgba(197, 165, 102, 0.2);
+  padding: 6px 16px;
+  border-radius: 2px;
+  cursor: pointer;
   transition: all 0.2s;
 }
 .parchment-btn:hover {
-  background: rgba(201, 168, 76, 0.2);
-  border-color: rgba(201, 168, 76, 0.6);
+  color: var(--color-ash-gold);
+  border-color: rgba(197, 165, 102, 0.45);
+  background: rgba(197, 165, 102, 0.08);
 }
 .parchment-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
-
 .parchment-input {
-  @apply w-full px-3 py-2 rounded border outline-none;
-  border-color: rgba(133, 80, 32, 0.3);
-  background: rgba(51, 27, 14, 0.6);
-  color: var(--color-parchment-100);
-}
-.parchment-input::placeholder {
-  color: rgba(201, 168, 76, 0.3);
+  width: 100%;
+  background: rgba(30, 26, 23, 0.8);
+  border: 1px solid rgba(197, 165, 102, 0.2);
+  color: var(--color-ash-parchment);
+  font-family: var(--font-body);
+  padding: 8px 12px;
+  border-radius: 2px;
+  outline: none;
+  transition: border-color 0.2s;
 }
 .parchment-input:focus {
-  border-color: rgba(201, 168, 76, 0.5);
-  box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.2);
+  border-color: rgba(197, 165, 102, 0.5);
+}
+.parchment-input::placeholder {
+  color: rgba(197, 165, 102, 0.3);
 }
 
-.horror-text {
-  text-shadow: 0 0 10px rgba(139, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.6);
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
-::-webkit-scrollbar-thumb { background: rgba(201, 168, 76, 0.3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(201, 168, 76, 0.5); }
-
-/* Dice animation */
-@keyframes dice-roll {
-  0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
-  25% { transform: rotateX(180deg) rotateY(90deg) rotateZ(45deg); }
-  50% { transform: rotateX(360deg) rotateY(180deg) rotateZ(90deg); }
-  75% { transform: rotateX(540deg) rotateY(270deg) rotateZ(135deg); }
-  100% { transform: rotateX(720deg) rotateY(360deg) rotateZ(180deg); }
-}
-.rolling { animation: dice-roll 1s ease-out; }
-
-@keyframes slideIn {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
+/* ── Old Tailwind compat (used by non-GamePage pages) ── */
+.text-cthulhu-gold { color: var(--color-ash-gold); }
+.text-cthulhu-blood { color: var(--color-ash-red); }
+.text-parchment-100 { color: var(--color-ash-parchment); }
+.text-parchment-200 { color: var(--color-ash-parchment); }
+.text-parchment-300 { color: var(--color-ash-parchment-dim); }
+.text-parchment-400 { color: var(--color-ash-parchment-dim); }
+.text-parchment-500 { color: var(--color-ash-gold-dim); }
+.text-parchment-600 { color: var(--color-ash-gold-dim); }
+.bg-parchment-950 { background: var(--color-ash-black); }
+.bg-parchment-900 { background: var(--color-ash-card); }
+.bg-parchment-800 { background: var(--color-ash-card); }
+.border-parchment-700 { border-color: var(--color-ash-border); }
+.font-display { font-family: var(--font-display); }
+.font-body { font-family: var(--font-body); }

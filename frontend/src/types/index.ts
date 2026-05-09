@@ -68,6 +68,12 @@ export interface DiceResult {
   total: number
 }
 
+export interface DiceCheckResult {
+  success: boolean
+  level: 'critical' | 'extreme' | 'hard' | 'regular' | 'failure' | 'fumble'
+  label: string
+}
+
 export interface StatusUpdate {
   HP_change?: number
   SAN_change?: number
@@ -119,6 +125,19 @@ export interface LocationTreeResponse {
   locations: LocationNode[]
 }
 
+export interface CharacterCard {
+  id: string
+  name: string
+  personality: string
+  background: string
+  relationships: string
+  dialogue_examples: string
+  first_message: string
+  portrait_path: string
+  source: 'manual' | 'png_import'
+  created_at?: string
+}
+
 export const COC_SKILL_LIST = [
   '会计', '人类学', '估价', '考古学', '艺术', '魅惑', '攀爬', '计算机使用',
   '信用评级', '克苏鲁神话', '乔装', '闪避', '汽车驾驶', '电气维修', '电子学',
@@ -127,3 +146,70 @@ export const COC_SKILL_LIST = [
   '导航', '神秘学', '重型机械', '说服', '驾驶', '精神分析', '心理学',
   '骑术', '科学', '巧手', '侦查', '潜行', '生存', '游泳', '投掷', '追踪',
 ]
+
+// COC 7e skill base values (from rulebook, before attribute-dependent skills)
+export const COC_SKILL_BASE: Record<string, number> = {
+  '会计': 5, '人类学': 1, '估价': 5, '考古学': 1, '艺术': 5,
+  '魅惑': 15, '攀爬': 20, '计算机使用': 5, '信用评级': 0,
+  '克苏鲁神话': 0, '乔装': 5, '汽车驾驶': 20, '电气维修': 10,
+  '电子学': 1, '快速交谈': 5, '格斗': 25, '枪械': 20,
+  '急救': 30, '历史': 5, '恐吓': 15, '跳跃': 20,
+  '法律': 5, '图书馆使用': 20, '聆听': 20, '锁匠': 1,
+  '机械维修': 10, '医学': 1, '自然世界': 10, '导航': 10,
+  '神秘学': 5, '重型机械': 1, '说服': 10, '精神分析': 1,
+  '心理学': 10, '骑术': 5, '科学': 1, '巧手': 10,
+  '侦查': 25, '潜行': 20, '生存': 10, '游泳': 20,
+  '投掷': 20, '追踪': 10,
+}
+
+// Skills whose base value depends on attributes (computed at character creation)
+export const COC_SKILL_ATTR_BASE: Record<string, string[]> = {
+  '闪避': ['DEX'],
+  '母语': ['EDU'],
+  '驾驶': ['DEX'],
+}
+
+// Social skills for "一项社交技能" selection
+export const SOCIAL_SKILLS = ['魅惑', '快速交谈', '恐吓', '说服', '心理学']
+
+// Lorebook
+export interface LorebookEntry {
+  id: string
+  lorebook_id: string
+  keywords: string[]
+  content: string
+  trigger_mode: 'keyword' | 'always' | 'manual'
+  search_range: 'all' | 'last_n' | 'user_input'
+  search_n: number
+  priority: number
+  insert_position: 'before_char' | 'after_char' | 'before_chat'
+  enabled: number
+  sort_order: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface Lorebook {
+  id: string
+  name: string
+  description: string
+  created_at?: string
+  updated_at?: string
+  entries?: LorebookEntry[]
+  entries_count?: number
+}
+
+export interface UserPersona {
+  id: string
+  name: string
+  appearance: string
+  background: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface TokenUsage {
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+}

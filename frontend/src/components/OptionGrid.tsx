@@ -1,4 +1,4 @@
-import type { DiceRequest } from '../types'
+import type { DiceRequest, DiceCheckResult } from '../types'
 
 interface DiceResult {
   expression: string
@@ -6,13 +6,23 @@ interface DiceResult {
   total: number
 }
 
-interface Props {
+const CHECK_COLORS: Record<string, string> = {
+  critical: '#ffd700',
+  extreme: '#4caf50',
+  hard: '#2196f3',
+  regular: '#9e9e9e',
+  failure: '#ff9800',
+  fumble: '#f44336',
+}
+
+interface OptionGridProps {
   options: string[]
   isStreaming: boolean
   showTextInput: boolean
   showDice: boolean
   pendingDiceRequest: DiceRequest | null
   diceResult: DiceResult | null
+  diceCheck: DiceCheckResult | null
   rolling: boolean
   textInput: string
   onOptionClick: (option: string) => void
@@ -22,85 +32,126 @@ interface Props {
   onToggleTextInput: () => void
 }
 
+const OPTION_LABELS = ['I', 'II', 'III', 'IV']
+
+function DiceSVG() {
+  return (
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--color-ash-gold)" strokeWidth="1" className="animate-bounce">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8" cy="8" r="1.2" fill="var(--color-ash-gold)" />
+      <circle cx="16" cy="16" r="1.2" fill="var(--color-ash-gold)" />
+      <circle cx="8" cy="16" r="1.2" fill="var(--color-ash-gold)" />
+      <circle cx="16" cy="8" r="1.2" fill="var(--color-ash-gold)" />
+    </svg>
+  )
+}
+
 export default function OptionGrid({
   options, isStreaming, showTextInput, showDice, pendingDiceRequest,
-  diceResult, rolling, textInput,
+  diceResult, diceCheck, rolling, textInput,
   onOptionClick, onDiceRoll, onTextSubmit, onTextInputChange, onToggleTextInput,
-}: Props) {
+}: OptionGridProps) {
   return (
-    <div className="border-t border-parchment-700/30 p-4 bg-parchment-950/90">
+    <div
+      className="p-3 mx-3 mb-3 ash-border-box"
+      style={{ borderTop: '1px solid rgba(197,165,102,0.15)' }}
+    >
       {/* Dice Overlay */}
       {showDice && pendingDiceRequest && (
-        <div className="mb-4 parchment-card border-cthulhu-gold/50 text-center max-w-3xl mx-auto">
-          <p className="text-cthulhu-gold font-display mb-2">🎲 检定!</p>
-          <p className="text-sm text-parchment-300 mb-3">{pendingDiceRequest.explanation}</p>
+        <div className="mb-3 ash-card-gold p-4 text-center" style={{ animation: 'slideUpIn 0.3s ease-out' }}>
+          <p className="font-display text-sm text-ash-gold mb-2" style={{ letterSpacing: '0.1em' }}>
+            SKILL CHECK
+          </p>
+          <p className="text-xs text-ash-parchment-dim mb-2">{pendingDiceRequest.explanation}</p>
           {pendingDiceRequest.type === 'skill_check' && (
-            <p className="text-xs text-parchment-500 mb-2">
-              技能: {pendingDiceRequest.skill} ({pendingDiceRequest.value}%) · 难度: {pendingDiceRequest.difficulty}
+            <p className="text-[0.6rem] text-ash-parchment-dim font-mono mb-3">
+              {pendingDiceRequest.skill} ({pendingDiceRequest.value}%) · {pendingDiceRequest.difficulty}
             </p>
           )}
           {rolling ? (
-            <div className="text-4xl rolling inline-block">🎲</div>
+            <div className="flex justify-center"><DiceSVG /></div>
           ) : (
-            <button onClick={onDiceRoll} className="parchment-btn text-lg px-8 py-3">
-              🎲 掷骰子!
+            <button
+              onClick={onDiceRoll}
+              className="ash-btn text-sm px-8 py-2"
+              style={{ borderColor: 'rgba(197,165,102,0.5)' }}
+            >
+              Roll Dice
             </button>
           )}
           {diceResult && (
-            <div className="mt-3 text-lg font-display text-cthulhu-gold">
-              结果: {diceResult.individual.join(' + ')} = {diceResult.total}
+            <div className="mt-3" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+              <div className="text-sm font-mono text-ash-gold">
+                {diceResult.individual.join(' + ')} = <span className="text-lg">{diceResult.total}</span>
+              </div>
+              {diceCheck && (
+                <div
+                  className="mt-1.5 text-xs font-display tracking-wider px-2 py-0.5 inline-block rounded"
+                  style={{
+                    color: CHECK_COLORS[diceCheck.level] || '#9e9e9e',
+                    backgroundColor: diceCheck.success ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)',
+                    border: `1px solid ${diceCheck.success ? 'rgba(76,175,80,0.3)' : 'rgba(244,67,54,0.3)'}`,
+                  }}
+                >
+                  {diceCheck.label}
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* 4 Options */}
+      {/* 4 Options in 2x2 Grid with stagger animation */}
       {options.length > 0 && !isStreaming && (
-        <div className="grid grid-cols-2 gap-3 max-w-3xl mx-auto mb-3">
+        <div className="grid grid-cols-2 gap-2 mb-2">
           {options.map((opt, i) => (
             <button
               key={i}
               onClick={() => onOptionClick(opt)}
-              className="parchment-card text-left hover:border-cthulhu-gold/50 transition-all
-                         cursor-pointer text-sm hover:bg-parchment-800/40"
+              className={`option-btn flex items-start gap-2 stagger-item stagger-delay-${i + 1}`}
             >
-              <span className="text-cthulhu-gold font-display mr-2 text-base">
-                {'①②③④'[i]}
+              <span className="font-mono text-[0.6rem] text-ash-gold-dim mt-0.5 flex-shrink-0">
+                {OPTION_LABELS[i] || i + 1}
               </span>
-              {opt}
+              <span className="text-sm">{opt}</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* Text Input */}
-      <div className="max-w-3xl mx-auto">
-        <button
-          onClick={onToggleTextInput}
-          className="parchment-btn text-xs mb-2"
-        >
-          {showTextInput ? '📝 关闭输入' : '📝 自由输入'}
+      {/* Text input toggle */}
+      <div className="flex items-center gap-2">
+        <button onClick={onToggleTextInput} className="ash-btn text-[0.6rem]">
+          {showTextInput ? 'Close Input' : 'Free Input'}
         </button>
 
-        {showTextInput && (
+        <div
+          style={{
+            flex: 1,
+            maxHeight: showTextInput ? '40px' : '0',
+            opacity: showTextInput ? 1 : 0,
+            overflow: 'hidden',
+            transition: 'max-height 0.25s ease, opacity 0.2s ease',
+          }}
+        >
           <form onSubmit={onTextSubmit}>
             <input
               type="text"
               value={textInput}
-              onChange={e => onTextInputChange(e.target.value)}
-              placeholder="输入你的行动..."
-              className="parchment-input"
+              onChange={(e) => onTextInputChange(e.target.value)}
+              placeholder="Describe your action..."
+              className="ash-input w-full text-sm"
               disabled={isStreaming}
             />
           </form>
+        </div>
+
+        {isStreaming && (
+          <span className="text-xs text-ash-parchment-dim animate-pulse ml-auto font-mono">
+            Keeper is narrating...
+          </span>
         )}
       </div>
-
-      {isStreaming && (
-        <div className="text-center text-parchment-500 text-sm animate-pulse mt-3">
-          守秘人正在叙述...
-        </div>
-      )}
     </div>
   )
 }

@@ -12,12 +12,33 @@ from app.api.modules import router as modules_router
 from app.api.characters import router as characters_router
 from app.api.sessions import router as sessions_router
 from app.api.locations import router as locations_router
+from app.api.settings import router as settings_router
+from app.api.cards import router as cards_router
+from app.api.saves import router as saves_router
+from app.api.lorebooks import router as lorebooks_router
+from app.api.personas import router as personas_router
 from app.models.location import Location  # noqa: F401
+from app.models.character_card import CharacterCard  # noqa: F401
+from app.models.game_save import GameSave  # noqa: F401
+from app.models.lorebook import Lorebook, LorebookEntry  # noqa: F401
+from app.models.user_persona import UserPersona  # noqa: F401
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    # Migrations for existing databases (SQLite doesn't auto-add columns)
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE character_cards ADD COLUMN first_message TEXT DEFAULT ''",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                conn.rollback()
     yield
 
 
@@ -36,6 +57,11 @@ app.include_router(modules_router)
 app.include_router(characters_router)
 app.include_router(sessions_router)
 app.include_router(locations_router)
+app.include_router(settings_router)
+app.include_router(cards_router)
+app.include_router(saves_router)
+app.include_router(lorebooks_router)
+app.include_router(personas_router)
 
 
 @app.get("/api/health")

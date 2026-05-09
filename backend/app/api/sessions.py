@@ -10,7 +10,7 @@ from app.models.character import Character
 from app.schemas.session import SessionCreate, PlayerAction, SessionResponse, SnapshotResponse
 from app.services.game_loop import GameLoop
 from app.api.auth import get_current_user
-from app.utils.sse import sse_stream
+from app.utils.sse import sse_stream, estimate_tokens
 
 from app.models.module import Module
 
@@ -168,46 +168,63 @@ async def player_action(
     async def event_generator():
         full_narrative = ""
         status_changes = None
+        output_chars = 0
 
-        async for event_type, payload in game_loop.run_turn(
-            module_id=session.module_id,
-            character_state=char_state,
-            chat_history=chat_history,
-            player_action=action_text,
-        ):
-            if event_type == "narrative":
-                full_narrative += payload.get("text", "")
-            elif event_type == "status_update":
-                status_changes = payload
-                if "HP_change" in payload:
-                    char.derived_stats["HP_current"] = max(
-                        0,
-                        char.derived_stats.get("HP_current", 0) + payload["HP_change"],
-                    )
-                    char.derived_stats["HP_current"] = min(
-                        char.derived_stats["HP_current"],
-                        char.derived_stats.get("HP_max", 99),
-                    )
-                if "SAN_change" in payload:
-                    char.derived_stats["SAN_current"] = max(
-                        0,
-                        char.derived_stats.get("SAN_current", 0) + payload["SAN_change"],
-                    )
-                    char.derived_stats["SAN_current"] = min(
-                        char.derived_stats["SAN_current"],
-                        char.derived_stats.get("SAN_max", 99),
-                    )
-                if "MP_change" in payload:
-                    char.derived_stats["MP_current"] = max(
-                        0,
-                        char.derived_stats.get("MP_current", 0) + payload["MP_change"],
-                    )
-                    char.derived_stats["MP_current"] = min(
-                        char.derived_stats["MP_current"],
-                        char.derived_stats.get("MP_max", 99),
-                    )
-
-            yield (event_type, payload)
+        try:
+            async for event_type, payload in game_loop.run_turn(
+                module_id=session.module_id,
+                character_state=char_state,
+                chat_history=chat_history,
+                player_action=action_text,
+            ):
+                if event_type == "narrative":
+                    text = payload.get("text", "")
+                    full_narrative += text
+                    output_chars += len(text)
+                    yield (event_type, payload)
+                elif event_type == "status_update":
+                    status_changes = payload
+                    if "HP_change" in payload:
+                        char.derived_stats["HP_current"] = max(
+                            0,
+                            char.derived_stats.get("HP_current", 0) + payload["HP_change"],
+                        )
+                        char.derived_stats["HP_current"] = min(
+                            char.derived_stats["HP_current"],
+                            char.derived_stats.get("HP_max", 99),
+                        )
+                    if "SAN_change" in payload:
+                        char.derived_stats["SAN_current"] = max(
+                            0,
+                            char.derived_stats.get("SAN_current", 0) + payload["SAN_change"],
+                        )
+                        char.derived_stats["SAN_current"] = min(
+                            char.derived_stats["SAN_current"],
+                            char.derived_stats.get("SAN_max", 99),
+                        )
+                    if "MP_change" in payload:
+                        char.derived_stats["MP_current"] = max(
+                            0,
+                            char.derived_stats.get("MP_current", 0) + payload["MP_change"],
+                        )
+                        char.derived_stats["MP_current"] = min(
+                            char.derived_stats["MP_current"],
+                            char.derived_stats.get("MP_max", 99),
+                        )
+                    yield (event_type, payload)
+                elif event_type == "done":
+                    # Emit token usage before done (sse_stream returns on done)
+                    system_prompt = game_loop.build_system_prompt(session.module_id, char_state, action_text)
+                    input_text = system_prompt + " " + " ".join(m.get("content", "") for m in chat_history) + " " + action_text
+                    est_input = estimate_tokens(input_text)
+                    est_output = estimate_tokens(output_chars)
+                    yield ("usage", {"input_tokens": est_input, "output_tokens": est_output, "total_tokens": est_input + est_output})
+                    yield (event_type, payload)
+                else:
+                    yield (event_type, payload)
+        except Exception as e:
+            yield ("error", {"detail": str(e)})
+            return
 
         snapshot.narrative_chunk = full_narrative
         if status_changes:

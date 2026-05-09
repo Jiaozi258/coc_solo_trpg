@@ -1,10 +1,9 @@
 import json
 from typing import AsyncGenerator
 from app.services.rag_service import rag_service
-from app.services.llm_adapter import get_llm_provider
+from app.services.llm_adapter import get_llm_provider, get_llm_model
 from app.services.dice import DiceEngine
 from app.services.character_validator import CharacterValidator
-from app.config import get_settings
 
 SYSTEM_PROMPT_TEMPLATE = """你是一个《克苏鲁的召唤》(Call of Cthulhu) 第七版 TRPG 的守秘人(Keeper)。
 
@@ -78,7 +77,6 @@ SYSTEM_PROMPT_TEMPLATE = """你是一个《克苏鲁的召唤》(Call of Cthulhu
 class GameLoop:
     def __init__(self):
         self.llm = get_llm_provider()
-        self.settings = get_settings()
 
     def build_system_prompt(self, module_id: str, character_state: dict, current_query: str) -> str:
         context = rag_service.get_module_context(module_id, current_query, max_chunks=5)
@@ -152,7 +150,7 @@ class GameLoop:
         async for text_chunk in self.llm.stream_chat(
             system_prompt=system_prompt,
             messages=messages,
-            model=self.settings.llm_model,
+            model=get_llm_model(),
         ):
             json_buffer += text_chunk
             narrative_text = self._extract_partial_narrative(json_buffer)

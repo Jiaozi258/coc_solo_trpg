@@ -1,7 +1,36 @@
 import json
+from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 from app.config import get_settings
+
+
+def _load_user_llm_config() -> dict:
+    """Read LLM config from user_settings.json with config.py fallback defaults."""
+    s = get_settings()
+    config = {
+        "ai_mode": "cloud",
+        "provider": "anthropic",  # cloud_provider when ai_mode=cloud
+        "api_key": s.anthropic_api_key or "",
+        "base_url": s.openai_base_url or "",
+        "model": "claude-sonnet-4-6",
+        "ollama_url": s.ollama_base_url,
+    }
+    try:
+        us = json.loads(Path("user_settings.json").read_text(encoding="utf-8"))
+        ai_mode = us.get("ai_mode", "cloud")
+        config["ai_mode"] = ai_mode
+        if ai_mode == "ollama":
+            config["ollama_url"] = us.get("ollama_url", config["ollama_url"])
+            config["model"] = us.get("ollama_model", "") or "llama3"
+        else:
+            config["provider"] = us.get("cloud_provider", "anthropic")
+            config["api_key"] = us.get("cloud_api_key", "") or config["api_key"]
+            config["base_url"] = us.get("cloud_base_url", "") or config["base_url"]
+            config["model"] = us.get("cloud_model", "") or "claude-sonnet-4-6"
+    except Exception:
+        pass
+    return config
 
 
 class LLMProvider(ABC):
@@ -54,9 +83,12 @@ class AnthropicProvider(LLMProvider):
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, base_url: str = ""):
         from openai import AsyncOpenAI
-        self.client = AsyncOpenAI(api_key=api_key)
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self.client = AsyncOpenAI(**kwargs)
 
     async def stream_chat(
         self, system_prompt: str, messages: list[dict], model: str
@@ -123,11 +155,13 @@ class OllamaProvider(LLMProvider):
 
 
 def get_llm_provider() -> LLMProvider:
-    s = get_settings()
-    if s.llm_provider == "anthropic":
-        return AnthropicProvider(s.anthropic_api_key)
-    elif s.llm_provider == "openai":
-        return OpenAIProvider(s.openai_api_key)
-    elif s.llm_provider == "ollama":
-        return OllamaProvider(s.ollama_base_url)
-    raise ValueError(f"Unknown LLM provider: {s.llm_provider}")
+    c = _load_user_llm_config()
+    if c["ai_mode"] == "ollama":
+        return OllamaProvider(c["ollama_url"])
+    if c["provider"] == "openai":
+        return OpenAIProvider(c["api_key"], c["base_url"])
+    return AnthropicProvider(c["api_key"])
+
+
+def get_llm_model() -> str:
+    return _load_user_llm_config()["model"]

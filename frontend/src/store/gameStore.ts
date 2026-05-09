@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DerivedStats, DiceRequest, StatusUpdate } from '../types'
+import type { DerivedStats, DiceRequest, StatusUpdate, TokenUsage } from '../types'
 
 interface GameState {
   narrative: string
@@ -10,6 +10,8 @@ interface GameState {
   derivedStats: DerivedStats | null
   isStreaming: boolean
   error: string | null
+  tokenUsage: TokenUsage
+  turnCount: number
 
   appendNarrative: (text: string) => void
   resetNarrative: () => void
@@ -21,6 +23,8 @@ interface GameState {
   setDerivedStats: (stats: DerivedStats) => void
   setStreaming: (v: boolean) => void
   setError: (err: string | null) => void
+  addTokenUsage: (usage: TokenUsage) => void
+  incrementTurn: () => void
   reset: () => void
 }
 
@@ -33,6 +37,8 @@ export const useGameStore = create<GameState>((set) => ({
   derivedStats: null,
   isStreaming: false,
   error: null,
+  tokenUsage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+  turnCount: 0,
 
   appendNarrative: (text) => set((s) => ({ narrative: s.narrative + text })),
   resetNarrative: () => set({ narrative: '' }),
@@ -52,6 +58,14 @@ export const useGameStore = create<GameState>((set) => ({
   setDerivedStats: (stats) => set({ derivedStats: stats }),
   setStreaming: (v) => set({ isStreaming: v }),
   setError: (err) => set({ error: err }),
+  addTokenUsage: (usage) => set((s) => ({
+    tokenUsage: {
+      input_tokens: s.tokenUsage.input_tokens + usage.input_tokens,
+      output_tokens: s.tokenUsage.output_tokens + usage.output_tokens,
+      total_tokens: s.tokenUsage.total_tokens + usage.total_tokens,
+    },
+  })),
+  incrementTurn: () => set((s) => ({ turnCount: s.turnCount + 1 })),
   reset: () =>
     set({
       narrative: '',
@@ -59,7 +73,10 @@ export const useGameStore = create<GameState>((set) => ({
       diceRequest: null,
       showDice: false,
       diceResult: null,
+      derivedStats: null,
       isStreaming: false,
       error: null,
+      tokenUsage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+      turnCount: 0,
     }),
 }))

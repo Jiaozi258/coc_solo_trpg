@@ -1,8 +1,38 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { listModules, listCharacters, listSessions, createSession, uploadModule } from '../api/client'
+import { listModules, listCharacters, listSessions, createSession, uploadModule, deleteModule, generateModule } from '../api/client'
+import AshSelect from '../components/AshSelect'
+import { toast } from '../components/Toast'
+import ConfirmDialog from '../components/ConfirmDialog'
 import type { Module, Character, GameSession } from '../types'
+
+const NPC_OPTIONS = [
+  { value: 'few', label: '少 (2-4个)' },
+  { value: 'medium', label: '中等 (5-10个)' },
+  { value: 'many', label: '多 (11-20个)' },
+]
+
+const ENEMY_OPTIONS = [
+  { value: 'few', label: '少 (1-3个)' },
+  { value: 'medium', label: '中等 (4-8个)' },
+  { value: 'many', label: '多 (9-15个)' },
+]
+
+const TONE_OPTIONS = [
+  { value: 'dark', label: '沉闷黑暗' },
+  { value: 'realistic', label: '现实残酷' },
+  { value: 'humorous', label: '幽默欢快' },
+  { value: 'mysterious', label: '神秘诡谲' },
+  { value: 'heroic', label: '英雄史诗' },
+]
+
+const DIFFICULTY_OPTIONS = [
+  { value: 'easy', label: '简单' },
+  { value: 'medium', label: '中等' },
+  { value: 'hard', label: '困难' },
+  { value: 'deadly', label: '致命' },
+]
 
 export default function HomePage() {
   const { isLoggedIn } = useAuthStore()
@@ -10,14 +40,37 @@ export default function HomePage() {
   const [characters, setCharacters] = useState<Character[]>([])
   const [sessions, setSessions] = useState<GameSession[]>([])
   const [uploading, setUploading] = useState(false)
+  const [delConfirm, setDelConfirm] = useState<{ open: boolean; id: string; title: string }>({ open: false, id: '', title: '' })
+  const [genError, setGenError] = useState('')
 
-  useEffect(() => {
+  // Custom module form
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const navigate = useNavigate()
+  const moduleSelectRef = useRef<HTMLSelectElement>(null)
+  const charSelectRef = useRef<HTMLSelectElement>(null)
+  const [genForm, setGenForm] = useState({
+    name: '',
+    background: '',
+    location: '',
+    player_count: 1,
+    npc_count: 'medium',
+    enemy_count: 'few',
+    tone: 'dark',
+    difficulty: 'medium',
+  })
+
+  const refreshData = () => {
     if (!isLoggedIn) return
     Promise.all([
       listModules().then(r => setModules(r.data)),
       listCharacters().then(r => setCharacters(r.data)),
       listSessions().then(r => setSessions(r.data)),
     ]).catch(console.error)
+  }
+
+  useEffect(() => {
+    refreshData()
   }, [isLoggedIn])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -26,21 +79,50 @@ export default function HomePage() {
     setUploading(true)
     try {
       await uploadModule(file)
-      const r = await listModules()
-      setModules(r.data)
+      refreshData()
     } catch (err: any) {
-      alert('上传失败: ' + (err.response?.data?.detail || err.message))
+      toast('上传失败: ' + (err.response?.data?.detail || err.message), 'error')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleDeleteModule = async (id: string) => {
+    try {
+      await deleteModule(id)
+      setModules(prev => prev.filter(m => m.id !== id))
+      toast('已删除')
+    } catch (err: any) {
+      toast('删除失败: ' + (err.response?.data?.detail || err.message), 'error')
+    }
+  }
+
+  const handleGenerate = async () => {
+    if (!genForm.name.trim() || !genForm.background.trim()) {
+      setGenError('请至少填写模组名称和背景故事')
+      return
+    }
+    setGenError('')
+    setGenerating(true)
+    try {
+      const r = await generateModule(genForm)
+      setShowCreateForm(false)
+      setGenForm({ name: '', background: '', location: '', player_count: 1, npc_count: 'medium', enemy_count: 'few', tone: 'dark', difficulty: 'medium' })
+      await refreshData()
+      toast(`模组 "${r.data.title}" 已生成！（${r.data.chunks_count} 个文本块）`, 'success')
+    } catch (err: any) {
+      toast('生成失败: ' + (err.response?.data?.detail || err.message), 'error')
+    } finally {
+      setGenerating(false)
     }
   }
 
   const handleNewSession = async (moduleId: string, characterId: string) => {
     try {
       const r = await createSession(moduleId, characterId, 0)
-      window.location.href = `/game/${r.data.id}`
+      navigate(`/game/${r.data.id}`)
     } catch (err: any) {
-      alert('创建会话失败: ' + (err.response?.data?.detail || err.message))
+      toast('创建会话失败: ' + (err.response?.data?.detail || err.message), 'error')
     }
   }
 
@@ -79,18 +161,146 @@ export default function HomePage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Module Upload */}
+      {/* Module Upload + Create */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-display text-cthulhu-gold horror-text">📜 模组管理</h2>
-          <label className="parchment-btn cursor-pointer">
-            {uploading ? '上传中...' : '上传 PDF 模组'}
-            <input type="file" accept=".pdf" onChange={handleUpload} className="hidden" disabled={uploading} />
-          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className="parchment-btn cursor-pointer"
+            >
+              {showCreateForm ? '取消' : '自建模组'}
+            </button>
+            <label className="parchment-btn cursor-pointer">
+              {uploading ? '上传中...' : '上传 PDF 模组'}
+              <input type="file" accept=".pdf" onChange={handleUpload} className="hidden" disabled={uploading} />
+            </label>
+          </div>
         </div>
+
+        {/* Custom Module Creation Form */}
+        <div className={`expand-enter ${showCreateForm ? 'open' : ''}`}>
+          <div className="parchment-card mb-4">
+            <h3 className="font-display text-cthulhu-gold text-lg mb-4">自建 COC 模组</h3>
+            <p className="text-sm text-parchment-400 mb-4">
+              填写核心信息，AI 守秘人将自动生成完整的跑团模组故事。
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-parchment-300 block mb-1">模组名称 *</label>
+                <input
+                  type="text"
+                  value={genForm.name}
+                  onChange={e => setGenForm({ ...genForm, name: e.target.value })}
+                  className="parchment-input w-full"
+                  placeholder="例如：暗夜低语"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-parchment-300 block mb-1">发生地点</label>
+                <input
+                  type="text"
+                  value={genForm.location}
+                  onChange={e => setGenForm({ ...genForm, location: e.target.value })}
+                  className="parchment-input w-full"
+                  placeholder="例如：阿卡姆镇"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-sm text-parchment-300 block mb-1">背景故事 *</label>
+                <textarea
+                  value={genForm.background}
+                  onChange={e => setGenForm({ ...genForm, background: e.target.value })}
+                  className="parchment-input w-full h-24 resize-none"
+                  placeholder="简述故事的起始背景，例如：一名大学教授在整理古籍时发现了一本禁忌之书，随后镇上开始发生离奇的失踪事件..."
+                />
+              </div>
+              <div>
+                <label className="text-sm text-parchment-300 block mb-1">游玩人数（含自己）</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={genForm.player_count}
+                  onChange={e => setGenForm({ ...genForm, player_count: Number(e.target.value) })}
+                  className="parchment-input w-full"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-parchment-300 block mb-1">NPC 数量</label>
+                <AshSelect
+                  value={genForm.npc_count}
+                  onChange={v => setGenForm({ ...genForm, npc_count: v })}
+                  options={NPC_OPTIONS}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-parchment-300 block mb-1">敌人数量</label>
+                <AshSelect
+                  value={genForm.enemy_count}
+                  onChange={v => setGenForm({ ...genForm, enemy_count: v })}
+                  options={ENEMY_OPTIONS}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-parchment-300 block mb-1">整体基调</label>
+                <AshSelect
+                  value={genForm.tone}
+                  onChange={v => setGenForm({ ...genForm, tone: v })}
+                  options={TONE_OPTIONS}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-sm text-parchment-300 block mb-1">整体难度</label>
+                <div className="flex gap-2">
+                  {DIFFICULTY_OPTIONS.map(o => {
+                    const isActive = genForm.difficulty === o.value
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setGenForm({ ...genForm, difficulty: o.value })}
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          letterSpacing: '0.1em',
+                          textTransform: 'uppercase',
+                          color: isActive ? 'var(--color-ash-gold)' : 'var(--color-ash-parchment-dim)',
+                          background: isActive ? 'rgba(197,165,102,0.1)' : 'transparent',
+                          border: isActive ? '1px solid rgba(197,165,102,0.5)' : '1px solid rgba(197,165,102,0.2)',
+                          padding: '6px 16px',
+                          borderRadius: '2px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {o.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="parchment-btn text-sm px-8 py-2"
+              >
+                {generating ? 'AI 正在生成模组...' : '生成模组'}
+              </button>
+              {genError && (
+                <p className="text-xs text-ash-red mt-1 text-center">{genError}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {modules.length === 0 ? (
           <div className="parchment-card text-center py-8 text-parchment-500">
-            暂无模组。上传一个 PDF 模组文件开始冒险。
+            暂无模组。上传一个 PDF 模组文件或自建一个模组开始冒险。
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
@@ -102,6 +312,13 @@ export default function HomePage() {
                     {m.filename} · {m.chunks_count} 个文本块
                   </p>
                 </div>
+                <button
+                  onClick={() => setDelConfirm({ open: true, id: m.id, title: m.title })}
+                  className="text-xs text-ash-red hover:text-ash-red-bright transition-colors px-2 py-1"
+                  title="删除模组"
+                >
+                  删除
+                </button>
               </div>
             ))}
           </div>
@@ -109,7 +326,6 @@ export default function HomePage() {
       </section>
 
       {/* Start New Game */}
-      {/* Game start — show if prerequisites met, or show hints */}
       <section className="mb-8">
         {modules.length > 0 && characters.length > 0 ? (
           <div className="parchment-card">
@@ -117,7 +333,7 @@ export default function HomePage() {
             <div className="flex gap-4 items-end">
               <div className="flex-1">
                 <label className="text-sm text-parchment-400">选择模组</label>
-                <select id="module-select" className="parchment-input mt-1">
+                <select ref={moduleSelectRef} className="parchment-input mt-1">
                   {modules.map(m => (
                     <option key={m.id} value={m.id}>{m.title}</option>
                   ))}
@@ -125,7 +341,7 @@ export default function HomePage() {
               </div>
               <div className="flex-1">
                 <label className="text-sm text-parchment-400">选择调查员</label>
-                <select id="char-select" className="parchment-input mt-1">
+                <select ref={charSelectRef} className="parchment-input mt-1">
                   {characters.map(c => (
                     <option key={c.id} value={c.id}>{c.name} ({c.occupation})</option>
                   ))}
@@ -133,9 +349,9 @@ export default function HomePage() {
               </div>
               <button
                 onClick={() => {
-                  const mid = (document.getElementById('module-select') as HTMLSelectElement).value
-                  const cid = (document.getElementById('char-select') as HTMLSelectElement).value
-                  handleNewSession(mid, cid)
+                  const mid = moduleSelectRef.current?.value || ''
+                  const cid = charSelectRef.current?.value || ''
+                  if (mid && cid) handleNewSession(mid, cid)
                 }}
                 className="parchment-btn"
               >
@@ -173,6 +389,18 @@ export default function HomePage() {
           </div>
         </section>
       )}
+      <ConfirmDialog
+        open={delConfirm.open}
+        title="删除模组"
+        message={`确定要删除「${delConfirm.title}」吗？此操作不可撤销。`}
+        confirmLabel="删除"
+        danger
+        onConfirm={() => {
+          handleDeleteModule(delConfirm.id)
+          setDelConfirm({ open: false, id: '', title: '' })
+        }}
+        onCancel={() => setDelConfirm({ open: false, id: '', title: '' })}
+      />
     </div>
   )
 }

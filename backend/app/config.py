@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from functools import lru_cache
 
 
 class Settings(BaseSettings):
@@ -11,6 +10,7 @@ class Settings(BaseSettings):
     llm_provider: str = "anthropic"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
+    openai_base_url: str = ""
     ollama_base_url: str = "http://localhost:11434"
     llm_model: str = "claude-sonnet-4-6"
     embedding_model: str = "text-embedding-3-small"
@@ -20,6 +20,5 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 
-@lru_cache()
 def get_settings() -> Settings:
     return Settings()

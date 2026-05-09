@@ -70,8 +70,10 @@ def get_character(
     authorization: str = Header(...),
 ):
     token = authorization.replace("Bearer ", "")
-    get_current_user(token, db)
-    char = db.query(Character).filter(Character.id == character_id).first()
+    user = get_current_user(token, db)
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == user.id
+    ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found")
     return _char_to_response(char)

@@ -10,3 +10,6 @@ venv/
 chroma_data/
 uploads/
 .superpowers/
+.vite/
+.claude/
+user_settings.json
