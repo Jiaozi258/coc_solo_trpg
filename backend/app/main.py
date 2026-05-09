@@ -27,18 +27,19 @@ from app.models.user_persona import UserPersona  # noqa: F401
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    # Migrations for existing databases (SQLite doesn't auto-add columns)
-    from sqlalchemy import text
-    migrations = [
-        "ALTER TABLE character_cards ADD COLUMN first_message TEXT DEFAULT ''",
-    ]
+    # Run safe migrations (only apply if column is missing)
+    from sqlalchemy import inspect
+    from sqlalchemy import text as sa_text
     with engine.connect() as conn:
-        for sql in migrations:
-            try:
-                conn.execute(text(sql))
-                conn.commit()
-            except Exception:
-                conn.rollback()
+        inspector = inspect(conn)
+        if 'character_cards' in inspector.get_table_names():
+            cols = [c['name'] for c in inspector.get_columns('character_cards')]
+            if 'first_message' not in cols:
+                try:
+                    conn.execute(sa_text("ALTER TABLE character_cards ADD COLUMN first_message TEXT DEFAULT ''"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
     yield
 
 

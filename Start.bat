@@ -31,6 +31,18 @@ if %ERRORLEVEL% NEQ 0 (
 echo   Python: OK
 echo   Node.js: OK
 
+REM Ensure required directories exist
+if not exist "%ROOT%backend\uploads\portraits" mkdir "%ROOT%backend\uploads\portraits"
+if not exist "%ROOT%backend\chroma_data" mkdir "%ROOT%backend\chroma_data"
+
+REM Copy .env.example to .env if .env doesn't exist
+if not exist "%ROOT%backend\.env" (
+    if exist "%ROOT%backend\.env.example" (
+        copy "%ROOT%backend\.env.example" "%ROOT%backend\.env" >nul
+        echo   .env created from .env.example
+    )
+)
+
 if not exist "%ROOT%backend\venv\Scripts\activate.bat" (
     echo.
     echo   [SETUP] Creating Python virtual environment...
