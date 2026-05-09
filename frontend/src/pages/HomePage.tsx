@@ -383,7 +383,7 @@ export default function HomePage() {
             {sessions.filter(s => s.status === 'active').map(s => (
               <Link key={s.id} to={`/game/${s.id}`} className="parchment-card hover:border-cthulhu-gold/50 transition-colors">
                 <h3 className="font-display text-parchment-200">会话 {s.id.slice(0, 8)}</h3>
-                <p className="text-xs text-parchment-500">{new Date(s.created_at!).toLocaleString()}</p>
+                <p className="text-xs text-parchment-500">{s.created_at ? new Date(s.created_at).toLocaleString() : ''}</p>
               </Link>
             ))}
           </div>

@@ -100,6 +100,11 @@ def update_character(
         errors = CharacterValidator.validate_attributes(merged)
         if errors:
             raise HTTPException(status_code=422, detail=errors)
+        luck_val = merged.get("LUCK")
+        if luck_val is not None:
+            errors_luck = CharacterValidator.validate_luck(luck_val)
+            if errors_luck:
+                raise HTTPException(status_code=422, detail=errors_luck)
         char.attributes = merged
         char.derived_stats = CharacterValidator.calculate_derived_stats(merged)
 

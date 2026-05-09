@@ -33,6 +33,7 @@ export function useChatSSE() {
     abortRef.current = new AbortController()
     let doneReceived = false
     let firstTokenReceived = false
+    let errorDispatched = false
 
     // First-token timeout: 60s for local models to start responding
     timerRef.current = setTimeout(() => {
@@ -136,11 +137,12 @@ export function useChatSSE() {
     } catch (err: any) {
       clearTimer()
       if (err.name !== 'AbortError') {
+        errorDispatched = true
         callbacks.onError(err.message)
       }
     } finally {
       clearTimer()
-      if (!doneReceived && abortRef.current && !abortRef.current.signal.aborted) {
+      if (!doneReceived && !errorDispatched && abortRef.current && !abortRef.current.signal.aborted) {
         callbacks.onDone()
       }
     }

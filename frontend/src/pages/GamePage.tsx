@@ -66,7 +66,10 @@ export default function GamePage() {
         setDerivedStats(r.data.character.derived_stats)
       }
       setModuleId(r.data.module_id)
-    }).catch(console.error).finally(() => setLoading(false))
+    }).catch((err) => {
+        console.error(err)
+        useGameStore.getState().setError('Failed to load session')
+      }).finally(() => setLoading(false))
   }, [sessionId, token, setDerivedStats])
 
   const handleAction = useCallback(async (action: string, diceRes: any = null) => {

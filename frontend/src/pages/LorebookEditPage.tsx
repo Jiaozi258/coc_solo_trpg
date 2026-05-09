@@ -133,7 +133,7 @@ export default function LorebookEditPage() {
       a.href = url
       a.download = `${lorebook?.name || 'lorebook'}.json`
       a.click()
-      URL.revokeObjectURL(url)
+      setTimeout(() => URL.revokeObjectURL(url), 500)
       toast('导出成功', 'success')
     } catch {
       toast('导出失败', 'error')

@@ -163,7 +163,7 @@ async def player_action(
         dice_results=dice_result_data,
     )
     db.add(snapshot)
-    db.commit()
+    db.flush()
 
     async def event_generator():
         full_narrative = ""
@@ -179,38 +179,31 @@ async def player_action(
             ):
                 if event_type == "narrative":
                     text = payload.get("text", "")
-                    full_narrative += text
+                    if payload.get("final"):
+                        full_narrative = text
+                    else:
+                        full_narrative += text
                     output_chars += len(text)
                     yield (event_type, payload)
                 elif event_type == "status_update":
                     status_changes = payload
+                    ds = dict(char.derived_stats)
                     if "HP_change" in payload:
-                        char.derived_stats["HP_current"] = max(
-                            0,
-                            char.derived_stats.get("HP_current", 0) + payload["HP_change"],
-                        )
-                        char.derived_stats["HP_current"] = min(
-                            char.derived_stats["HP_current"],
-                            char.derived_stats.get("HP_max", 99),
-                        )
+                        ds["HP_current"] = max(0, min(
+                            ds.get("HP_max", 99),
+                            ds.get("HP_current", 0) + payload["HP_change"],
+                        ))
                     if "SAN_change" in payload:
-                        char.derived_stats["SAN_current"] = max(
-                            0,
-                            char.derived_stats.get("SAN_current", 0) + payload["SAN_change"],
-                        )
-                        char.derived_stats["SAN_current"] = min(
-                            char.derived_stats["SAN_current"],
-                            char.derived_stats.get("SAN_max", 99),
-                        )
+                        ds["SAN_current"] = max(0, min(
+                            ds.get("SAN_max", 99),
+                            ds.get("SAN_current", 0) + payload["SAN_change"],
+                        ))
                     if "MP_change" in payload:
-                        char.derived_stats["MP_current"] = max(
-                            0,
-                            char.derived_stats.get("MP_current", 0) + payload["MP_change"],
-                        )
-                        char.derived_stats["MP_current"] = min(
-                            char.derived_stats["MP_current"],
-                            char.derived_stats.get("MP_max", 99),
-                        )
+                        ds["MP_current"] = max(0, min(
+                            ds.get("MP_max", 99),
+                            ds.get("MP_current", 0) + payload["MP_change"],
+                        ))
+                    char.derived_stats = ds
                     yield (event_type, payload)
                 elif event_type == "done":
                     # Emit token usage before done (sse_stream returns on done)
@@ -224,6 +217,7 @@ async def player_action(
                     yield (event_type, payload)
         except Exception as e:
             yield ("error", {"detail": str(e)})
+            db.rollback()
             return
 
         snapshot.narrative_chunk = full_narrative
@@ -252,7 +246,8 @@ def get_snapshots(
     user = get_current_user(token, db)
     snapshots = (
         db.query(SessionSnapshot)
-        .filter(SessionSnapshot.session_id == session_id)
+        .join(GameSessionModel)
+        .filter(SessionSnapshot.session_id == session_id, GameSessionModel.user_id == user.id)
         .order_by(SessionSnapshot.turn_number)
         .all()
     )

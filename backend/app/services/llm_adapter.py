@@ -16,8 +16,9 @@ def _load_user_llm_config() -> dict:
         "model": "claude-sonnet-4-6",
         "ollama_url": s.ollama_base_url,
     }
+    settings_path = Path(__file__).resolve().parent.parent.parent / "user_settings.json"
     try:
-        us = json.loads(Path("user_settings.json").read_text(encoding="utf-8"))
+        us = json.loads(settings_path.read_text(encoding="utf-8"))
         ai_mode = us.get("ai_mode", "cloud")
         config["ai_mode"] = ai_mode
         if ai_mode == "ollama":
@@ -79,7 +80,9 @@ class AnthropicProvider(LLMProvider):
             system=system_prompt,
             messages=formatted,
         )
-        return response.content[0].text
+        if response.content and len(response.content) > 0:
+            return response.content[0].text
+        return ""
 
 
 class OpenAIProvider(LLMProvider):

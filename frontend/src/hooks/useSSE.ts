@@ -23,6 +23,7 @@ export function useSSE() {
     abortRef.current?.abort()
     abortRef.current = new AbortController()
     let doneReceived = false
+    let errorDispatched = false
 
     try {
       const resp = await fetch(`/api/sessions/${sessionId}/action`, {
@@ -118,11 +119,11 @@ export function useSSE() {
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
+        errorDispatched = true
         callbacks.onError(err.message)
       }
     } finally {
-      // Ensure onDone is called even if server disconnects without 'done' event
-      if (!doneReceived && abortRef.current && !abortRef.current.signal.aborted) {
+      if (!doneReceived && !errorDispatched && abortRef.current && !abortRef.current.signal.aborted) {
         callbacks.onDone()
       }
     }

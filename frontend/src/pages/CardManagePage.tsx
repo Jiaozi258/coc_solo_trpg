@@ -36,7 +36,7 @@ export default function CardManagePage() {
     return () => {
       if (portraitPreview) URL.revokeObjectURL(portraitPreview)
     }
-  }, [])
+  }, [portraitPreview])
 
   const handleCreate = async () => {
     if (!form.name.trim()) { toast('请输入角色名称', 'error'); return }

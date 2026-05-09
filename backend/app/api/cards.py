@@ -266,7 +266,7 @@ async def chat_with_card(
             # Load user dialogue_length preference
             dl = "medium"
             try:
-                us = json.loads(Path("user_settings.json").read_text(encoding="utf-8"))
+                us = json.loads((Path(__file__).resolve().parent.parent.parent / "user_settings.json").read_text(encoding="utf-8"))
                 dl = us.get("dialogue_length", "medium")
             except Exception:
                 pass

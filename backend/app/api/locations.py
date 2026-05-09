@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.location import Location
+from app.models.module import Module
 from app.api.auth import get_current_user
 
 router = APIRouter(prefix="/api/modules", tags=["locations"])
@@ -32,8 +33,8 @@ def get_locations(
     authorization: str = Header(...),
 ):
     token = authorization.replace("Bearer ", "")
-    get_current_user(token, db)
+    user = get_current_user(token, db)
 
-    locations = db.query(Location).filter(Location.module_id == module_id).all()
+    locations = db.query(Location).join(Module).filter(Location.module_id == module_id, Module.user_id == user.id).all()
     tree = _build_location_tree(locations)
     return {"module_id": module_id, "locations": tree}

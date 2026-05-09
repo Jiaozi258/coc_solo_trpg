@@ -1,5 +1,6 @@
 import json
 import re
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -19,7 +20,7 @@ class CreateLorebookRequest(BaseModel):
 
 
 class UpdateLorebookRequest(BaseModel):
-    name: str = Field(default="", max_length=200)
+    name: Optional[str] = Field(default=None, max_length=200)
     description: str = Field(default="", max_length=2000)
 
 
@@ -123,7 +124,7 @@ def update_lorebook(
     if not lorebook:
         raise HTTPException(status_code=404, detail="Lorebook not found")
 
-    if body.name:
+    if body.name is not None:
         lorebook.name = body.name
     if body.description:
         lorebook.description = body.description

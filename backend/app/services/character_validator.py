@@ -75,10 +75,10 @@ class CharacterValidator:
         mp_max = max(1, pow_ // 5)
         if str_ < siz and dex < siz:
             move = 7
-        elif str_ >= siz or dex >= siz:
-            move = 8
-        else:
+        elif str_ >= siz and dex >= siz:
             move = 9
+        else:
+            move = 8
         build = 0 if str_ + siz <= 64 else (1 if str_ + siz <= 84 else 2)
         dodge_base = dex // 2
 

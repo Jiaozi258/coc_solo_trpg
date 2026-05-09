@@ -48,8 +48,13 @@ export function useDice() {
     }
 
     // Add flat modifiers (e.g., "1d10+2", "1d6-1", "1d6+3d4+2")
-    const modifierMatch = expression.match(/(?<![dD])([+-]\d+)(?![dD])/g)
-    if (modifierMatch) {
+    // Use compatible approach: find all +N/-N, exclude those adjacent to d/D
+    const allMatches = expression.match(/[+-]\d+/g) || []
+    const modifierMatch = allMatches.filter(m => {
+      const idx = expression.indexOf(m)
+      return idx === 0 || !/[dD]/.test(expression[idx - 1])
+    })
+    if (modifierMatch.length > 0) {
       for (const mod of modifierMatch) {
         total += parseInt(mod)
       }

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, saveSettings, uploadBgImage, uploadBgMusic, deleteBgImage, deleteBgMusic, listSaves, deleteSave, getSave, listPersonas, createPersona, deletePersona, updatePersona, testLLMConnection, testImageGen } from '../api/client'
+import { getSettings, saveSettings, uploadBgImage, uploadBgMusic, deleteBgImage, deleteBgMusic, listSaves, deleteSave, listPersonas, createPersona, deletePersona, testLLMConnection, testImageGen } from '../api/client'
 import { toast } from '../components/Toast'
 
 interface Settings {

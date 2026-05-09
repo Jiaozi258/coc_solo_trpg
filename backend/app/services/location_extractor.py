@@ -41,7 +41,11 @@ LOCATION_EXTRACTION_PROMPT = """你是一个 RPG 游戏模组分析器。请从�
 
 class LocationExtractor:
     def __init__(self):
-        self.llm = get_llm_provider()
+        pass
+
+    @property
+    def llm(self):
+        return get_llm_provider()
 
     async def extract_locations(self, module_text: str) -> list[dict]:
         """从模组文本提取地点树。返回可递归存入数据库的 dict 列表。"""

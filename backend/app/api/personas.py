@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -17,8 +18,8 @@ class CreatePersonaRequest(BaseModel):
 
 class UpdatePersonaRequest(BaseModel):
     name: str = Field(default="", max_length=100)
-    appearance: str = Field(default="", max_length=3000)
-    background: str = Field(default="", max_length=3000)
+    appearance: Optional[str] = Field(default=None, max_length=3000)
+    background: Optional[str] = Field(default=None, max_length=3000)
 
 
 @router.post("")
@@ -71,7 +72,7 @@ def update_persona(
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
 
-    if body.name:
+    if body.name is not None:
         persona.name = body.name
     if body.appearance is not None:
         persona.appearance = body.appearance

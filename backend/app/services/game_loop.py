@@ -76,7 +76,11 @@ SYSTEM_PROMPT_TEMPLATE = """你是一个《克苏鲁的召唤》(Call of Cthulhu
 
 class GameLoop:
     def __init__(self):
-        self.llm = get_llm_provider()
+        pass
+
+    @property
+    def llm(self):
+        return get_llm_provider()
 
     def build_system_prompt(self, module_id: str, character_state: dict, current_query: str) -> str:
         context = rag_service.get_module_context(module_id, current_query, max_chunks=5)
@@ -168,6 +172,13 @@ class GameLoop:
             elif "```" in clean:
                 clean = clean.split("```")[1].split("```")[0].strip()
             parsed = json.loads(clean)
+            if not isinstance(parsed, dict):
+                parsed = {
+                    "narrative": json_buffer,
+                    "options": ["继续探索", "仔细观察", "与NPC交谈", "查阅资料"],
+                    "dice_request": None,
+                    "status_update": None,
+                }
         except json.JSONDecodeError:
             parsed = {
                 "narrative": json_buffer,

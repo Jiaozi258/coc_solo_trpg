@@ -135,7 +135,7 @@ export default function ChatPage() {
         total_tokens: prev.total_tokens + usage.total_tokens,
       })),
     }, undefined, lorebookId || undefined, personaId || undefined)
-  }, [card, cardId, streaming, token, sendMessage, lorebookId, personaId])
+  }, [card, cardId, streaming, token, sendMessage, lorebookId, personaId, showSetupDialog])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

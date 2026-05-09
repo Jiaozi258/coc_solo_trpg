@@ -214,7 +214,7 @@ export default function CharacterPage() {
       for (const [k, v] of Object.entries(char.skills)) {
         if (!occSkills.includes(k)) {
           const base = COC_SKILL_BASE[k] ?? 0
-          if (v > base) interestAlloc[k] = v
+          if (v > base) interestAlloc[k] = v - base
         }
       }
     }
