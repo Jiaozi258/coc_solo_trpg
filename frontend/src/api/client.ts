@@ -221,4 +221,7 @@ export const testImageGen = () =>
 export const generateImage = (prompt: string, size?: string) =>
   api.post('/settings/generate-image', { prompt, size: size || '1024x1024' })
 
+export const listComfyuiCheckpoints = () =>
+  api.post('/settings/comfyui-checkpoints')
+
 export default api

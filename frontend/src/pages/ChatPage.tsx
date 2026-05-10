@@ -248,6 +248,9 @@ export default function ChatPage() {
       if (r.data.url) {
         setGeneratedImgs(prev => ({ ...prev, [msgId]: r.data.url }))
         toast('图片已生成')
+      } else if (r.data.urls && r.data.urls.length > 0) {
+        setGeneratedImgs(prev => ({ ...prev, [msgId]: r.data.urls[0] }))
+        toast(r.data.urls.length > 1 ? `已生成 ${r.data.urls.length} 张图片` : '图片已生成')
       } else if (r.data.text) {
         setGeneratedImgs(prev => ({ ...prev, [msgId]: r.data.text }))
         toast('图片已生成')

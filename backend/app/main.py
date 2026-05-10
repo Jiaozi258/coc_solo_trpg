@@ -3,8 +3,10 @@ os.environ.setdefault("CHROMA_TELEMETRY_IMPL", "none")
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.database import engine, Base
 
 from app.api.auth import router as auth_router
@@ -63,6 +65,12 @@ app.include_router(cards_router)
 app.include_router(saves_router)
 app.include_router(lorebooks_router)
 app.include_router(personas_router)
+
+
+# Serve uploaded/generated files
+uploads_dir = Path("uploads")
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/api/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 
 @app.get("/api/health")

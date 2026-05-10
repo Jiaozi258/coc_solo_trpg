@@ -335,8 +335,11 @@ export default function CharacterPage() {
                      onChange={e => setAttr(name, Number(e.target.value))}
                      className="w-full accent-cthulhu-gold" />
               <div className="flex justify-center mt-1">
-                <input type="number" value={attrs[name]}
-                       onChange={e => setAttr(name, Number(e.target.value))}
+                <input type="text" inputMode="numeric" pattern="[0-9]*" value={attrs[name]}
+                       onChange={e => {
+                         const raw = e.target.value.replace(/\D/g, '')
+                         setAttr(name, raw === '' ? 0 : Number(raw))
+                       }}
                        className="parchment-input w-20 text-center" />
               </div>
             </div>
@@ -349,8 +352,11 @@ export default function CharacterPage() {
             <input type="range" min={0} max={99} value={luck}
                    onChange={e => setLuck(Number(e.target.value))}
                    className="flex-1 accent-cthulhu-gold" />
-            <input type="number" value={luck}
-                   onChange={e => setLuck(Number(e.target.value))}
+            <input type="text" inputMode="numeric" pattern="[0-9]*" value={luck}
+                   onChange={e => {
+                     const raw = e.target.value.replace(/\D/g, '')
+                     setLuck(raw === '' ? 0 : Number(raw))
+                   }}
                    className="parchment-input w-20 text-center" />
           </div>
         </div>

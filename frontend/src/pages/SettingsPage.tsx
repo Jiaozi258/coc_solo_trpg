@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, saveSettings, uploadBgImage, uploadBgMusic, deleteBgImage, deleteBgMusic, listSaves, deleteSave, listPersonas, createPersona, deletePersona, testLLMConnection, testImageGen } from '../api/client'
+import { getSettings, saveSettings, uploadBgImage, uploadBgMusic, deleteBgImage, deleteBgMusic, listSaves, deleteSave, listPersonas, createPersona, deletePersona, testLLMConnection, testImageGen, listComfyuiCheckpoints } from '../api/client'
 import { toast } from '../components/Toast'
 
 interface Settings {
@@ -17,6 +17,7 @@ interface Settings {
   image_gen_provider?: string
   image_gen_model?: string
   image_gen_api_key?: string
+  comfyui_url?: string
   has_background_image?: boolean
   has_background_music?: boolean
 }
@@ -44,6 +45,7 @@ const DEFAULT_SETTINGS: Settings = {
   image_gen_provider: '',
   image_gen_model: 'dall-e-3',
   image_gen_api_key: '',
+  comfyui_url: 'http://localhost:8188',
   has_background_image: false,
   has_background_music: false,
 }
@@ -69,6 +71,8 @@ export default function SettingsPage() {
   const [llmTesting, setLlmTesting] = useState(false)
   const [imgGenStatus, setImgGenStatus] = useState<{ status: string; message?: string; error?: string; available?: string[] } | null>(null)
   const [imgGenTesting, setImgGenTesting] = useState(false)
+  const [comfyCheckpoints, setComfyCheckpoints] = useState<string[]>([])
+  const [comfyCheckpointsLoading, setComfyCheckpointsLoading] = useState(false)
   const [newPersona, setNewPersona] = useState({ name: '', appearance: '', background: '' })
   const [showPersonaForm, setShowPersonaForm] = useState(false)
   const imgRef = useRef<HTMLInputElement>(null)
@@ -92,6 +96,7 @@ export default function SettingsPage() {
           image_gen_provider: data.image_gen_provider || '',
           image_gen_model: data.image_gen_model || 'dall-e-3',
           image_gen_api_key: data.image_gen_api_key ?? '',
+          comfyui_url: data.comfyui_url || 'http://localhost:8188',
           has_background_image: !!data.has_background_image,
           has_background_music: !!data.has_background_music,
         })
@@ -160,6 +165,27 @@ export default function SettingsPage() {
       setImgGenStatus({ status: 'error', error: e?.response?.data?.error || e.message })
     } finally {
       setImgGenTesting(false)
+    }
+  }
+
+  const handleListCheckpoints = async () => {
+    setComfyCheckpointsLoading(true)
+    try {
+      const r = await listComfyuiCheckpoints()
+      if (r.data.status === 'ok') {
+        setComfyCheckpoints(r.data.checkpoints || [])
+        if ((r.data.checkpoints || []).length === 0) {
+          toast('没有检测到模型，请将 checkpoint 文件放入 ComfyUI/models/checkpoints/ 目录', 'error')
+        } else {
+          toast(`检测到 ${r.data.checkpoints.length} 个模型`)
+        }
+      } else {
+        toast('检测失败: ' + (r.data.message || '未知错误'), 'error')
+      }
+    } catch (e: any) {
+      toast('检测失败: ' + (e?.response?.data?.detail || e.message), 'error')
+    } finally {
+      setComfyCheckpointsLoading(false)
     }
   }
 
@@ -467,24 +493,27 @@ export default function SettingsPage() {
             </button>
           </div>
           <p className="text-[0.55rem] text-ash-parchment-dim mb-3">
-            需要独立的 OpenAI API Key（不同于对话用的 Key）。DeepSeek 等第三方 Key 不支持生图。
+            OpenAI DALL-E / GPT-4o 需要独立的 API Key。ComfyUI 使用本地服务，无需 Key。
           </p>
           <div className="space-y-3">
-            <div>
-              <label className="text-[0.6rem] font-mono text-ash-parchment-dim uppercase tracking-wider block mb-1">OpenAI API Key（生图专用）</label>
-              <input
-                type="password"
-                value={settings.image_gen_api_key || ''}
-                onChange={e => setSettings({ ...settings, image_gen_api_key: e.target.value })}
-                className="ash-input w-full"
-                placeholder="sk-... 填写你的 OpenAI API Key"
-              />
-            </div>
+            {(['openai_dalle', 'openai_gpt'].includes(settings.image_gen_provider || '')) && (
+              <div>
+                <label className="text-[0.6rem] font-mono text-ash-parchment-dim uppercase tracking-wider block mb-1">OpenAI API Key（生图专用）</label>
+                <input
+                  type="password"
+                  value={settings.image_gen_api_key || ''}
+                  onChange={e => setSettings({ ...settings, image_gen_api_key: e.target.value })}
+                  className="ash-input w-full"
+                  placeholder="sk-... 填写你的 OpenAI API Key"
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               {[
                 { value: '', label: '关闭' },
                 { value: 'openai_dalle', label: 'DALL-E' },
                 { value: 'openai_gpt', label: 'GPT-4o 生图' },
+                { value: 'comfyui', label: 'ComfyUI' },
               ].map(o => {
                 const isActive = (settings.image_gen_provider || '') === o.value
                 return (
@@ -512,6 +541,49 @@ export default function SettingsPage() {
                 )
               })}
             </div>
+            {(settings.image_gen_provider || '') === 'comfyui' && (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[0.6rem] font-mono text-ash-parchment-dim uppercase tracking-wider block mb-1">ComfyUI 地址</label>
+                  <input
+                    type="text"
+                    value={settings.comfyui_url || 'http://localhost:8188'}
+                    onChange={e => setSettings({ ...settings, comfyui_url: e.target.value })}
+                    className="ash-input w-full"
+                    placeholder="http://localhost:8188"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleListCheckpoints}
+                    disabled={comfyCheckpointsLoading}
+                    className="ash-btn text-[0.6rem]"
+                  >
+                    {comfyCheckpointsLoading ? '检测中...' : '检测可用模型'}
+                  </button>
+                  {comfyCheckpoints.length > 0 && (
+                    <span className="text-[0.6rem] text-ash-parchment-dim">
+                      {comfyCheckpoints.length} 个模型可用
+                    </span>
+                  )}
+                </div>
+                {comfyCheckpoints.length > 0 && (
+                  <div className="p-2 rounded max-h-24 overflow-y-auto"
+                    style={{ background: 'rgba(22,19,17,0.5)', border: '1px solid rgba(197,165,102,0.08)' }}>
+                    {comfyCheckpoints.map((ckpt, i) => (
+                      <div key={i} className="text-[0.55rem] text-ash-parchment-dim font-mono truncate">
+                        {ckpt}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {comfyCheckpoints.length === 0 && !comfyCheckpointsLoading && (
+                  <p className="text-[0.55rem] text-ash-parchment-dim">
+                    点击"检测可用模型"获取 Checkpoint 列表。生图时会自动使用第一个可用模型。
+                  </p>
+                )}
+              </div>
+            )}
             {imgGenStatus && (
               <div className={`p-3 rounded text-sm ${imgGenStatus.status === 'ok' ? '' : ''}`}
                 style={{
