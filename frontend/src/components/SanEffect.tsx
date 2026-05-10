@@ -11,7 +11,10 @@ export default function SanEffect({ trigger }: SanEffectProps) {
     if (trigger) {
       setActive(true)
       const timer = setTimeout(() => setActive(false), 1500)
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(timer)
+        setActive(false)
+      }
     }
   }, [trigger])
 

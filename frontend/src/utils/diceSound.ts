@@ -47,7 +47,7 @@ export function playDiceSound() {
       gain2.connect(ctx.destination)
       src2.start()
     }, 80)
-  } catch {
+  } catch (_e) {
     // Audio not available — silently skip
   }
 }

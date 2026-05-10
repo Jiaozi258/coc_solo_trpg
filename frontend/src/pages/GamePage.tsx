@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useGameStore } from '../store/gameStore'
 import { useSSE } from '../hooks/useSSE'
-import { useDice } from '../hooks/useDice'
+import { useDice, resolveD100 } from '../hooks/useDice'
 import { getSession, getSettings } from '../api/client'
 import { useLayoutStore } from '../store/layoutStore'
 import type { Character, DiceRequest } from '../types'
@@ -21,7 +21,7 @@ export default function GamePage() {
   const navigate = useNavigate()
   const token = useAuthStore((s) => s.token)!
   const { streamAction } = useSSE()
-  const { roll, rolling, result: diceResult, check: diceCheck, setResult } = useDice()
+  const { roll, rolling, result: diceResult, check: diceCheck } = useDice()
   const store = useGameStore()
   const setDerivedStats = useGameStore((s) => s.setDerivedStats)
   const setCharacterClick = useLayoutStore((s) => s.setCharacterClick)
@@ -113,11 +113,13 @@ export default function GamePage() {
   const handleDiceRoll = () => {
     if (!pendingDiceRequest) return
     const result = roll(pendingDiceRequest)
-    const check = diceCheck
     const req = pendingDiceRequest
-    setPendingDiceRequest(null)
+    const check = req.type === 'skill_check' && req.value != null
+      ? resolveD100(result.total, req.value)
+      : null
     setDiceCanvasKey(k => k + 1)
     setTimeout(() => {
+      setPendingDiceRequest(null)
       store.setDiceResult(result)
       if (check) {
         store.addDiceLog({

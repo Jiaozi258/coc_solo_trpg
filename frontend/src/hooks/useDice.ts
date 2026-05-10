@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { DiceRequest, DiceResult, DiceCheckResult } from '../types'
 
-function resolveD100(total: number, skillValue: number): DiceCheckResult | null {
+export function resolveD100(total: number, skillValue: number): DiceCheckResult | null {
   if (skillValue <= 0) return null
   if (total === 1) return { success: true, level: 'critical', label: '大成功' }
   if (total <= Math.floor(skillValue / 5)) return { success: true, level: 'extreme', label: '极难成功' }

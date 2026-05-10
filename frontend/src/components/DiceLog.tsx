@@ -1,11 +1,4 @@
-interface DiceLogEntry {
-  skill?: string
-  roll: number
-  target: number
-  success: boolean
-  level: string
-  timestamp: number
-}
+import type { DiceLogEntry } from '../types'
 
 interface DiceLogProps {
   entries: DiceLogEntry[]
