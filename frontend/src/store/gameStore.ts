@@ -12,6 +12,8 @@ interface GameState {
   error: string | null
   tokenUsage: TokenUsage
   turnCount: number
+  diceLog: { skill?: string; roll: number; target: number; success: boolean; level: string; timestamp: number }[]
+  previousSan: number
 
   appendNarrative: (text: string) => void
   resetNarrative: () => void
@@ -25,6 +27,8 @@ interface GameState {
   setError: (err: string | null) => void
   addTokenUsage: (usage: TokenUsage) => void
   incrementTurn: () => void
+  addDiceLog: (entry: { skill?: string; roll: number; target: number; success: boolean; level: string }) => void
+  setPreviousSan: (san: number) => void
   reset: () => void
 }
 
@@ -39,6 +43,8 @@ export const useGameStore = create<GameState>((set) => ({
   error: null,
   tokenUsage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
   turnCount: 0,
+  diceLog: [],
+  previousSan: 0,
 
   appendNarrative: (text) => set((s) => ({ narrative: s.narrative + text })),
   resetNarrative: () => set({ narrative: '' }),
@@ -66,6 +72,10 @@ export const useGameStore = create<GameState>((set) => ({
     },
   })),
   incrementTurn: () => set((s) => ({ turnCount: s.turnCount + 1 })),
+  addDiceLog: (entry) => set((s) => ({
+    diceLog: [...s.diceLog.slice(-9), { ...entry, timestamp: Date.now() }],
+  })),
+  setPreviousSan: (san) => set({ previousSan: san }),
   reset: () =>
     set({
       narrative: '',
@@ -78,5 +88,7 @@ export const useGameStore = create<GameState>((set) => ({
       error: null,
       tokenUsage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
       turnCount: 0,
+      diceLog: [],
+      previousSan: 0,
     }),
 }))
