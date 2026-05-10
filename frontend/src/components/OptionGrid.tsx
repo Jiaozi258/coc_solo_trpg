@@ -1,4 +1,6 @@
 import type { DiceRequest, DiceCheckResult } from '../types'
+import DiceCanvas from './DiceCanvas'
+import { playDiceSound } from '../utils/diceSound'
 
 interface DiceResult {
   expression: string
@@ -6,14 +8,6 @@ interface DiceResult {
   total: number
 }
 
-const CHECK_COLORS: Record<string, string> = {
-  critical: '#ffd700',
-  extreme: '#4caf50',
-  hard: '#2196f3',
-  regular: '#9e9e9e',
-  failure: '#ff9800',
-  fumble: '#f44336',
-}
 
 interface OptionGridProps {
   options: string[]
@@ -30,6 +24,8 @@ interface OptionGridProps {
   onTextSubmit: (e: React.FormEvent) => void
   onTextInputChange: (value: string) => void
   onToggleTextInput: () => void
+  onDiceResultComplete?: () => void
+  diceCanvasKey?: number
 }
 
 const OPTION_LABELS = ['I', 'II', 'III', 'IV']
@@ -50,12 +46,10 @@ export default function OptionGrid({
   options, isStreaming, showTextInput, showDice, pendingDiceRequest,
   diceResult, diceCheck, rolling, textInput,
   onOptionClick, onDiceRoll, onTextSubmit, onTextInputChange, onToggleTextInput,
+  onDiceResultComplete,
 }: OptionGridProps) {
   return (
-    <div
-      className="p-3 mx-3 mb-3 ash-border-box"
-      style={{ borderTop: '1px solid rgba(197,165,102,0.15)' }}
-    >
+    <div className="parchment-card px-4 py-3 mx-3 mb-2 paper-tilt-none">
       {/* Dice Overlay */}
       {showDice && pendingDiceRequest && (
         <div className="mb-3 ash-card-gold p-4 text-center" style={{ animation: 'slideUpIn 0.3s ease-out' }}>
@@ -72,30 +66,35 @@ export default function OptionGrid({
             <div className="flex justify-center"><DiceSVG /></div>
           ) : (
             <button
-              onClick={onDiceRoll}
+              onClick={() => {
+              playDiceSound()
+              onDiceRoll()
+            }}
               className="ash-btn text-sm px-8 py-2"
               style={{ borderColor: 'rgba(197,165,102,0.5)' }}
             >
               Roll Dice
             </button>
           )}
-          {diceResult && (
-            <div className="mt-3" style={{ animation: 'fadeIn 0.3s ease-out' }}>
-              <div className="text-sm font-mono text-ash-gold">
-                {diceResult.individual.join(' + ')} = <span className="text-lg">{diceResult.total}</span>
+          {rolling && diceResult && (
+            <div className="flex justify-center py-2">
+              <DiceCanvas
+                rolling={rolling}
+                result={diceResult.total}
+                onDone={() => onDiceResultComplete?.()}
+              />
+            </div>
+          )}
+
+          {diceResult && !rolling && diceCheck && (
+            <div className={`text-center py-2 px-3 rounded ${diceCheck.success ? 'bg-green-900/20 border border-green-800/30' : 'bg-red-900/20 border border-red-800/30'}`}>
+              <span className={`font-display text-sm ${diceCheck.success ? 'text-green-400' : 'text-red-400'}`}>
+                {diceCheck.success ? 'SUCCESS' : 'FAILURE'}
+              </span>
+              <span className="text-xs text-ash-parchment-dim ml-2">{diceCheck.label}</span>
+              <div className="text-[0.6rem] text-ash-parchment-dim font-mono mt-0.5">
+                {diceResult.individual.join(' + ')} = {diceResult.total}
               </div>
-              {diceCheck && (
-                <div
-                  className="mt-1.5 text-xs font-display tracking-wider px-2 py-0.5 inline-block rounded"
-                  style={{
-                    color: CHECK_COLORS[diceCheck.level] || '#9e9e9e',
-                    backgroundColor: diceCheck.success ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)',
-                    border: `1px solid ${diceCheck.success ? 'rgba(76,175,80,0.3)' : 'rgba(244,67,54,0.3)'}`,
-                  }}
-                >
-                  {diceCheck.label}
-                </div>
-              )}
             </div>
           )}
         </div>
