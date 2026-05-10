@@ -25,11 +25,14 @@ export default function DiceCanvas({ rolling, result, onDone }: DiceCanvasProps)
   const animRef = useRef<number>(0)
   const particlesRef = useRef<Particle[]>([])
   const startTimeRef = useRef(0)
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
 
   const tick = useCallback((timestamp: number) => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')!
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
     const w = canvas.width
     const h = canvas.height
     const elapsed = timestamp - startTimeRef.current
@@ -39,29 +42,34 @@ export default function DiceCanvas({ rolling, result, onDone }: DiceCanvasProps)
     const particles = particlesRef.current
     let allSettled = true
 
-    particles.forEach(p => {
-      if (elapsed < DURATION) {
-        p.vy += GRAVITY
-        p.x += p.vx
-        p.y += p.vy
-        p.vx *= FRICTION
-        p.rotation += p.rotSpeed
-        p.rotSpeed *= FRICTION
-
-        if (p.y > h - DIE_SIZE / 2 - 10) {
-          p.y = h - DIE_SIZE / 2 - 10
-          p.vy *= -BOUNCE
-          p.vx *= BOUNCE
-          if (Math.abs(p.vy) < 1) {
-            p.vy = 0
-            p.vx = 0
-            p.rotSpeed = 0
-            p.settled = true
-          }
-        }
-      } else {
+    // Physics update
+    for (const p of particles) {
+      if (p.settled) continue
+      if (elapsed >= DURATION) {
         p.settled = true
+        continue
       }
+      p.vy += GRAVITY
+      p.x += p.vx
+      p.y += p.vy
+      p.vx *= FRICTION
+      p.rotation += p.rotSpeed
+      p.rotSpeed *= FRICTION
+
+      if (p.y > h - DIE_SIZE / 2 - 10) {
+        p.y = h - DIE_SIZE / 2 - 10
+        p.vy *= -BOUNCE
+        p.vx *= BOUNCE
+        if (Math.abs(p.vy) < 1) {
+          p.vy = 0
+          p.vx = 0
+          p.rotSpeed = 0
+          p.settled = true
+        }
+      }
+    }
+
+    for (const p of particles) {
       if (!p.settled) allSettled = false
 
       // Draw die face
@@ -90,14 +98,14 @@ export default function DiceCanvas({ rolling, result, onDone }: DiceCanvasProps)
       ctx.textBaseline = 'middle'
       ctx.fillText(String(p.value), 0, 1)
       ctx.restore()
-    })
+    }
 
     if (!allSettled || elapsed < DURATION) {
       animRef.current = requestAnimationFrame(tick)
     } else {
-      onDone()
+      onDoneRef.current()
     }
-  }, [onDone])
+  }, [])
 
   useEffect(() => {
     if (rolling && result !== null) {
@@ -106,9 +114,10 @@ export default function DiceCanvas({ rolling, result, onDone }: DiceCanvasProps)
       const w = canvas.width
       const h = canvas.height
 
-      // Tens die and ones die
-      const tens = Math.floor(result / 10)
-      const ones = result % 10
+      // Tens die and ones die (D100: 1-100 maps to two d10 faces)
+      const d100 = result % 100
+      const tens = Math.floor(d100 / 10)
+      const ones = d100 % 10
       startTimeRef.current = performance.now()
       particlesRef.current = [
         { x: w * 0.3, y: -DIE_SIZE, vx: 2 + Math.random() * 2, vy: 2, rotation: 0, rotSpeed: 8 + Math.random() * 6, value: tens, settled: false },
@@ -119,7 +128,7 @@ export default function DiceCanvas({ rolling, result, onDone }: DiceCanvasProps)
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current)
     }
-  }, [rolling, result, tick])
+  }, [rolling, result])
 
   return (
     <canvas
