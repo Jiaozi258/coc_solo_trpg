@@ -44,17 +44,19 @@ export default function DialogueBox({ narrative, isStreaming, error }: DialogueB
       )}
 
       {narrative && (
-        <div
-          className="ash-border-box p-4 dialogue-area whitespace-pre-wrap"
-          style={{ animation: !isStreaming ? 'fadeIn 0.4s ease-out' : undefined }}
-        >
-          {narrative}
-          {isStreaming && (
-            <span
-              className="inline-block w-2 h-4 ml-0.5 align-text-bottom bg-ash-gold"
-              style={{ animation: 'typewriter-cursor 1s infinite' }}
-            />
-          )}
+        <div className="parchment-card paper-tilt-r px-4 py-3 mx-3 parchment-reveal">
+          <div
+            className="dialogue-area whitespace-pre-wrap font-serif"
+            style={{ color: 'var(--color-ash-dark-brown)', animation: !isStreaming ? 'fadeIn 0.4s ease-out' : undefined }}
+          >
+            {narrative}
+            {isStreaming && (
+              <span
+                className="inline-block w-2 h-4 ml-0.5 align-text-bottom"
+                style={{ backgroundColor: 'var(--color-ash-dark-brown)', animation: 'typewriter-cursor 1s infinite' }}
+              />
+            )}
+          </div>
         </div>
       )}
 
