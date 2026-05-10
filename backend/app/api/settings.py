@@ -1,5 +1,8 @@
+import asyncio
+import copy
 import json
 import os
+import random
 import shutil
 import time
 from pathlib import Path
@@ -39,6 +42,56 @@ class UserSettings(BaseModel):
     image_gen_provider: str = ""  # "" (disabled), "openai_dalle", "openai_gpt"
     image_gen_model: str = "dall-e-3"  # model name for image generation
     image_gen_api_key: str = ""  # dedicated OpenAI API key for image generation
+    comfyui_url: str = "http://localhost:8188"  # ComfyUI server URL
+
+
+# Default SD1.5/SDXL text-to-image workflow template
+# The prompt is injected into the CLIPTextEncode node connected to KSampler's "positive" input
+COMFYUI_DEFAULT_WORKFLOW = {
+    "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}},
+    "2": {"class_type": "EmptyLatentImage", "inputs": {"width": 1024, "height": 1024, "batch_size": 1}},
+    "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "__PROMPT__", "clip": ["1", 1]}},
+    "4": {"class_type": "CLIPTextEncode", "inputs": {"text": "ugly, deformed, bad anatomy, low quality, worst quality", "clip": ["1", 1]}},
+    "5": {"class_type": "KSampler", "inputs": {"seed": 42, "steps": 20, "cfg": 7.0, "sampler_name": "euler", "scheduler": "normal", "denoise": 1.0, "model": ["1", 0], "positive": ["3", 0], "negative": ["4", 0], "latent_image": ["2", 0]}},
+    "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+    "7": {"class_type": "PreviewImage", "inputs": {"images": ["6", 0]}},
+}
+
+
+COMFYUI_WORKFLOW_FILE = Path("comfyui_workflow.json")
+
+
+def _load_comfyui_workflow() -> dict:
+    """Load ComfyUI workflow from JSON file. If not exists, create with default template."""
+    if COMFYUI_WORKFLOW_FILE.exists():
+        try:
+            with open(COMFYUI_WORKFLOW_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    with open(COMFYUI_WORKFLOW_FILE, "w", encoding="utf-8") as f:
+        json.dump(COMFYUI_DEFAULT_WORKFLOW, f, ensure_ascii=False, indent=2)
+    return COMFYUI_DEFAULT_WORKFLOW
+
+
+def _inject_prompt(workflow: dict, prompt: str) -> dict:
+    """Inject the user prompt into the positive CLIPTextEncode node of a ComfyUI workflow.
+    Supports CLIPTextEncode, CLIPTextEncodeSDXL, and any custom node connected to KSampler.positive."""
+    wf = copy.deepcopy(workflow)
+    ksampler_nodes = [nid for nid, n in wf.items() if n.get("class_type") == "KSampler"]
+    for ksid in ksampler_nodes:
+        pos_input = wf[ksid]["inputs"].get("positive")
+        if pos_input and isinstance(pos_input, list) and len(pos_input) == 2:
+            pos_node_id = str(pos_input[0])
+            if pos_node_id in wf:
+                pos_node = wf[pos_node_id]
+                if "text" in pos_node.get("inputs", {}):
+                    pos_node["inputs"]["text"] = prompt
+                    break
+    for n in wf.values():
+        if n.get("class_type") == "KSampler" and "seed" in n.get("inputs", {}):
+            n["inputs"]["seed"] = random.randint(0, 2**31 - 1)
+    return wf
 
 
 def _load_settings() -> dict:
@@ -300,10 +353,11 @@ async def test_image_generation(
             api_key = stored.get("image_gen_api_key") or stored.get("cloud_api_key") or llm_config["api_key"]
             if not api_key:
                 return {"status": "error", "message": "未设置图片生成 API Key，请在设置中填写", "provider": provider, "model": model}
+            base_url = stored.get("cloud_base_url", "").rstrip("/") or "https://api.openai.com/v1"
 
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    "https://api.openai.com/v1/models",
+                    f"{base_url}/models",
                     headers={"Authorization": f"Bearer {api_key}"},
                     timeout=10.0,
                 )
@@ -330,10 +384,11 @@ async def test_image_generation(
             api_key = stored.get("image_gen_api_key") or stored.get("cloud_api_key") or llm_config["api_key"]
             if not api_key:
                 return {"status": "error", "message": "未设置云端 API Key"}
+            base_url = stored.get("cloud_base_url", "").rstrip("/") or "https://api.openai.com/v1"
 
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    "https://api.openai.com/v1/models",
+                    f"{base_url}/models",
                     headers={"Authorization": f"Bearer {api_key}"},
                     timeout=10.0,
                 )
@@ -348,11 +403,64 @@ async def test_image_generation(
                 else:
                     return {"status": "error", "message": f"API Key 可能不支持 OpenAI"}
 
+        elif provider == "comfyui":
+            import httpx
+            comfyui_url = stored.get("comfyui_url", "http://localhost:8188").rstrip("/")
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(f"{comfyui_url}/system_stats", timeout=10.0)
+                    if resp.status_code == 200:
+                        return {"status": "ok", "provider": "comfyui", "model": "ComfyUI", "message": f"ComfyUI 可用 ({comfyui_url})"}
+                    else:
+                        return {"status": "error", "message": f"ComfyUI 返回 {resp.status_code}，请检查服务是否正常运行"}
+            except Exception as e:
+                return {"status": "error", "message": f"无法连接到 ComfyUI ({comfyui_url}): {str(e)[:200]}"}
+
         else:
             return {"status": "error", "message": f"未知的图片生成提供商: {provider}"}
 
     except Exception as e:
         return {"status": "error", "provider": provider, "model": model, "error": str(e)[:500]}
+
+
+@router.post("/comfyui-checkpoints")
+async def list_comfyui_checkpoints(
+    db: Session = Depends(get_db),
+    authorization: str = Header(...),
+):
+    """Query ComfyUI for available checkpoints and models."""
+    token = authorization.replace("Bearer ", "")
+    get_current_user(token, db)
+
+    stored = _load_settings()
+    comfyui_url = stored.get("comfyui_url", "http://localhost:8188").rstrip("/")
+
+    import httpx
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{comfyui_url}/object_info", timeout=10.0)
+            if resp.status_code != 200:
+                return {"status": "error", "message": f"ComfyUI 返回 {resp.status_code}"}
+            data = resp.json()
+
+            checkpoints = []
+            # CheckpointLoaderSimple.ckpt_name lists available .safetensors/.ckpt files
+            loader_info = data.get("CheckpointLoaderSimple", {})
+            ckpt_input = loader_info.get("input", {}).get("required", {}).get("ckpt_name", [])
+            if isinstance(ckpt_input, list) and len(ckpt_input) > 0:
+                checkpoints = ckpt_input[0]  # First element is the list of available values
+
+            # Also check CheckpointLoader (older node)
+            loader_info2 = data.get("CheckpointLoader", {})
+            ckpt_input2 = loader_info2.get("input", {}).get("required", {}).get("ckpt_name", [])
+            if isinstance(ckpt_input2, list) and len(ckpt_input2) > 0:
+                for c in ckpt_input2[0]:
+                    if c not in checkpoints:
+                        checkpoints.append(c)
+
+            return {"status": "ok", "checkpoints": checkpoints, "comfyui_url": comfyui_url}
+    except Exception as e:
+        return {"status": "error", "message": f"无法连接 ComfyUI: {str(e)[:200]}"}
 
 
 class GenerateImageRequest(BaseModel):
@@ -386,10 +494,11 @@ async def generate_image(
             api_key = stored.get("image_gen_api_key") or stored.get("cloud_api_key") or llm_config["api_key"]
             if not api_key:
                 raise HTTPException(status_code=400, detail="No cloud API key configured")
+            base_url = stored.get("cloud_base_url", "").rstrip("/") or "https://api.openai.com/v1"
 
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
-                    "https://api.openai.com/v1/images/generations",
+                    f"{base_url}/images/generations",
                     json={
                         "model": model,
                         "prompt": body.prompt,
@@ -411,10 +520,11 @@ async def generate_image(
             api_key = stored.get("image_gen_api_key") or stored.get("cloud_api_key") or llm_config["api_key"]
             if not api_key:
                 raise HTTPException(status_code=400, detail="No cloud API key configured")
+            base_url = stored.get("cloud_base_url", "").rstrip("/") or "https://api.openai.com/v1"
 
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
+                    f"{base_url}/chat/completions",
                     json={
                         "model": model,
                         "messages": [
@@ -432,10 +542,129 @@ async def generate_image(
                 else:
                     raise HTTPException(status_code=resp.status_code, detail=f"GPT API error: {resp.text[:500]}")
 
+        elif provider == "comfyui":
+            import httpx
+            comfyui_url = stored.get("comfyui_url", "http://localhost:8188").rstrip("/")
+
+            workflow = _load_comfyui_workflow()
+
+            # Auto-detect and inject available checkpoint if the configured one doesn't exist
+            try:
+                async with httpx.AsyncClient() as pre_client:
+                    obj_resp = await pre_client.get(f"{comfyui_url}/object_info", timeout=10.0)
+                    if obj_resp.status_code == 200:
+                        obj_data = obj_resp.json()
+                        available_ckpts = []
+                        for loader_name in ("CheckpointLoaderSimple", "CheckpointLoader"):
+                            loader = obj_data.get(loader_name, {})
+                            ckpt_list = loader.get("input", {}).get("required", {}).get("ckpt_name", [])
+                            if isinstance(ckpt_list, list) and len(ckpt_list) > 0:
+                                available_ckpts.extend(ckpt_list[0])
+                        if available_ckpts:
+                            # Find CheckpointLoader nodes that need fixing
+                            for node in workflow.values():
+                                if node.get("class_type") in ("CheckpointLoaderSimple", "CheckpointLoader"):
+                                    current = node["inputs"].get("ckpt_name", "")
+                                    if current and current not in available_ckpts:
+                                        node["inputs"]["ckpt_name"] = available_ckpts[0]
+            except Exception:
+                pass  # If can't reach ComfyUI for detection, proceed with configured workflow
+
+            workflow = _inject_prompt(workflow, body.prompt)
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    f"{comfyui_url}/prompt",
+                    json={"prompt": workflow},
+                    timeout=30.0,
+                )
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=502, detail=f"ComfyUI 提交失败: {resp.text[:300]}")
+                data = resp.json()
+
+                if data.get("error"):
+                    error_msg = data["error"]
+                    if isinstance(error_msg, dict):
+                        error_msg = error_msg.get("message", str(error_msg))
+                    raise HTTPException(status_code=502, detail=f"ComfyUI 错误: {error_msg}")
+
+                prompt_id = data.get("prompt_id")
+                if not prompt_id:
+                    raise HTTPException(status_code=502, detail="ComfyUI 未返回 prompt_id")
+
+                # Poll for completion
+                max_wait = 300
+                poll_interval = 2
+                elapsed = 0
+                while elapsed < max_wait:
+                    await asyncio.sleep(poll_interval)
+                    elapsed += poll_interval
+                    hist_resp = await client.get(f"{comfyui_url}/history/{prompt_id}", timeout=10.0)
+                    if hist_resp.status_code != 200:
+                        continue
+                    history = hist_resp.json()
+                    if prompt_id not in history:
+                        continue
+
+                    prompt_data = history[prompt_id]
+                    status_info = prompt_data.get("status", {})
+
+                    # Check for ComfyUI-side errors (bad workflow, missing model, OOM, etc.)
+                    if status_info.get("status_str") == "error":
+                        messages = status_info.get("messages", [])
+                        error_details = []
+                        for m in messages:
+                            if isinstance(m, list) and len(m) >= 2:
+                                error_details.append(f"[{m[0]}] {m[1]}")
+                            elif isinstance(m, str):
+                                error_details.append(m)
+                        detail = "; ".join(error_details) if error_details else "ComfyUI 工作流执行失败，请检查 comfyui_workflow.json 中的模型名称是否正确"
+                        raise HTTPException(status_code=502, detail=f"ComfyUI 生成失败: {detail}")
+
+                    outputs = prompt_data.get("outputs", {})
+                    if outputs:
+                        image_files = []
+                        for node_output in outputs.values():
+                            for img in node_output.get("images", []):
+                                filename = img.get("filename", "")
+                                subfolder = img.get("subfolder", "")
+                                img_type = img.get("type", "output")
+                                if filename:
+                                    image_files.append((filename, subfolder, img_type))
+                        if image_files:
+                            local_dir = UPLOAD_DIR / "comfyui_outputs"
+                            local_dir.mkdir(parents=True, exist_ok=True)
+                            local_urls = []
+                            for filename, subfolder, img_type in image_files:
+                                params = {"filename": filename, "type": img_type}
+                                if subfolder:
+                                    params["subfolder"] = subfolder
+                                img_resp = await client.get(f"{comfyui_url}/view", params=params, timeout=60.0)
+                                if img_resp.status_code == 200:
+                                    local_name = f"{prompt_id}_{filename}"
+                                    local_path = local_dir / local_name
+                                    with open(local_path, "wb") as f:
+                                        f.write(img_resp.content)
+                                    local_urls.append(f"/api/uploads/comfyui_outputs/{local_name}")
+                            if local_urls:
+                                return {"status": "ok", "urls": local_urls, "prompt": body.prompt}
+
+                    if status_info.get("completed") is False:
+                        continue
+                    break
+                raise HTTPException(status_code=504, detail="ComfyUI 生图超时（5分钟），请检查 ComfyUI 是否正在运行、工作流是否正确")
+
         else:
             raise HTTPException(status_code=400, detail=f"Unknown image gen provider: {provider}")
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:500])
+        msg = str(e)
+        if "connect" in msg.lower() or "name or service not known" in msg.lower():
+            provider_name = {"openai_dalle": "OpenAI DALL-E", "openai_gpt": "OpenAI GPT", "comfyui": "ComfyUI"}.get(provider, provider)
+            if provider in ("openai_dalle", "openai_gpt"):
+                msg = f"无法连接到 OpenAI API（{provider_name}）。如果您在中国大陆，请在设置中填写 cloud_base_url 代理地址。原始错误: {msg}"
+            else:
+                msg = f"无法连接到 {provider_name}。请检查服务是否正在运行。原始错误: {msg}"
+        raise HTTPException(status_code=500, detail=msg[:500])

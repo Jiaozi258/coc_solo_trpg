@@ -493,20 +493,28 @@ body {
 .font-display { font-family: var(--font-display); }
 .font-body { font-family: var(--font-body); }
 
-/* ── Parchment paper style ── */
+/* ── Parchment card (dark default, works on all pages) ── */
 .parchment-card {
-  background: linear-gradient(135deg, #f4e4c1 0%, #e8d5a3 50%, #f0dbb5 100%);
-  border: 1px solid rgba(139, 109, 69, 0.25);
+  background: var(--color-ash-card);
+  border: 1px solid var(--color-ash-border);
   border-radius: 2px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.25),
+    0 1px 2px rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+
+/* ── Parchment paper style (GamePage felt desktop only) ── */
+.bg-felt .parchment-card {
+  background: linear-gradient(135deg, #f4e4c1 0%, #e8d5a3 50%, #f0dbb5 100%);
+  border-color: rgba(139, 109, 69, 0.25);
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.25),
     0 1px 2px rgba(0, 0, 0, 0.15),
     inset 0 0 30px rgba(200, 180, 140, 0.15);
-  position: relative;
 }
 
-/* Noise texture overlay */
-.parchment-card::after {
+.bg-felt .parchment-card::after {
   content: '';
   position: absolute;
   inset: 0;
