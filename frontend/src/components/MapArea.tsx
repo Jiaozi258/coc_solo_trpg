@@ -48,8 +48,9 @@ export default function MapArea({ moduleId }: MapAreaProps) {
   const displayLocs = currentLocations.length > 0 ? currentLocations : locations
 
   return (
+    <div className="parchment-card paper-tilt-l mx-3 mt-2 mb-1 overflow-hidden">
     <div
-      className="ash-border-box m-3 mb-0 flex flex-col transition-all duration-300"
+      className="ash-border-box flex flex-col transition-all duration-300"
       style={{ minHeight: isCollapsed ? 0 : 220 }}
     >
       {/* Header bar */}
@@ -203,6 +204,7 @@ export default function MapArea({ moduleId }: MapAreaProps) {
           )}
         </div>
       </div>
+    </div>
     </div>
   )
 }
