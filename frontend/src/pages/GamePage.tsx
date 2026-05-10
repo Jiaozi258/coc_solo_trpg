@@ -83,7 +83,7 @@ export default function GamePage() {
     store.setOptions([])
 
     streamAction(sessionId, action, token, diceRes, {
-      onNarrative: (text) => store.appendNarrative(text),
+      onNarrative: (text, final) => store.appendNarrative(text, final),
       onOptions: (opts) => store.setOptions(opts),
       onDiceRequest: (req) => {
         store.setDiceRequest(req)

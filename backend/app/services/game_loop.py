@@ -189,9 +189,14 @@ class GameLoop:
                 "status_update": None,
             }
 
+        # Ensure options is always a non-empty list
+        options = parsed.get("options", [])
+        if not isinstance(options, list) or len(options) == 0:
+            options = ["继续探索", "仔细观察", "与NPC交谈", "查阅资料"]
+
         final_narrative = parsed.get("narrative") or ""
         yield ("narrative", {"text": final_narrative, "final": True})
-        yield ("options", {"options": parsed.get("options", [])})
+        yield ("options", {"options": options})
 
         dice_request = parsed.get("dice_request")
         if dice_request:

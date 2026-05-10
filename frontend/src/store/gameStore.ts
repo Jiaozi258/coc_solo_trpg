@@ -15,7 +15,7 @@ interface GameState {
   diceLog: { skill?: string; roll: number; target: number; success: boolean; level: string; timestamp: number }[]
   previousSan: number
 
-  appendNarrative: (text: string) => void
+  appendNarrative: (text: string, final?: boolean) => void
   resetNarrative: () => void
   setOptions: (opts: string[]) => void
   setDiceRequest: (req: DiceRequest | null) => void
@@ -46,7 +46,9 @@ export const useGameStore = create<GameState>((set) => ({
   diceLog: [],
   previousSan: 0,
 
-  appendNarrative: (text) => set((s) => ({ narrative: s.narrative + text })),
+  appendNarrative: (text, final) => set((s) => ({
+    narrative: final ? text : s.narrative + text,
+  })),
   resetNarrative: () => set({ narrative: '' }),
   setOptions: (opts) => set({ options: opts }),
   setDiceRequest: (req) => set({ diceRequest: req, showDice: req !== null }),
