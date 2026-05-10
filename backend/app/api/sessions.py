@@ -308,6 +308,25 @@ def rollback_session(
     }
 
 
+@router.delete("/{session_id}")
+async def delete_session(session_id: str, db: Session = Depends(get_db), authorization: str = Header(...)):
+    """Delete a game session and its snapshots."""
+    token = authorization.replace("Bearer ", "")
+    get_current_user(token, db)
+
+    session = db.query(GameSessionModel).filter(GameSessionModel.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Delete all snapshots for this session
+    db.query(SessionSnapshot).filter(SessionSnapshot.session_id == session_id).delete()
+    # Delete the session itself
+    db.delete(session)
+    db.commit()
+
+    return {"detail": "Session deleted"}
+
+
 def _session_to_response(s: GameSessionModel) -> dict:
     return {
         "id": s.id,

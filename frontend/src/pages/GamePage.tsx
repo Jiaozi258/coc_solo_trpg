@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useGameStore } from '../store/gameStore'
@@ -36,6 +36,7 @@ export default function GamePage() {
   const [loading, setLoading] = useState(true)
   const [sanShock, setSanShock] = useState(false)
   const [diceCanvasKey, setDiceCanvasKey] = useState(0)
+  const initialTriggered = useRef(false)
 
   // Register 【人物】button handler in top bar
   useEffect(() => {
@@ -109,6 +110,14 @@ export default function GamePage() {
       onUsage: (usage) => store.addTokenUsage(usage),
     })
   }, [sessionId, token, streamAction, store])
+
+  // Auto-trigger opening turn on game start (fires once)
+  useEffect(() => {
+    if (!loading && !initialTriggered.current) {
+      initialTriggered.current = true
+      handleAction('开始游戏')
+    }
+  }, [loading, handleAction])
 
   const handleDiceRoll = () => {
     if (!pendingDiceRequest) return

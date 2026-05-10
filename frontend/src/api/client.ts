@@ -92,6 +92,9 @@ export const getSnapshots = (session_id: string) =>
 export const rollbackSession = (session_id: string, snapshot_id: string) =>
   api.post(`/sessions/${session_id}/rollback/${snapshot_id}`)
 
+export const deleteSession = (id: string) =>
+  api.delete(`/sessions/${id}`)
+
 export const getLocations = (moduleId: string) =>
   api.get(`/modules/${moduleId}/locations`)
 

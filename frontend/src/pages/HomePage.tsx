@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { listModules, listCharacters, listSessions, createSession, uploadModule, deleteModule, generateModule } from '../api/client'
+import { listModules, listCharacters, listSessions, createSession, uploadModule, deleteModule, deleteSession, generateModule } from '../api/client'
 import AshSelect from '../components/AshSelect'
 import { toast } from '../components/Toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -40,7 +40,7 @@ export default function HomePage() {
   const [characters, setCharacters] = useState<Character[]>([])
   const [sessions, setSessions] = useState<GameSession[]>([])
   const [uploading, setUploading] = useState(false)
-  const [delConfirm, setDelConfirm] = useState<{ open: boolean; id: string; title: string }>({ open: false, id: '', title: '' })
+  const [delConfirm, setDelConfirm] = useState<{ open: boolean; id: string; title: string; type: 'module' | 'session' }>({ open: false, id: '', title: '', type: 'module' })
   const [genError, setGenError] = useState('')
 
   // Custom module form
@@ -84,6 +84,16 @@ export default function HomePage() {
       toast('上传失败: ' + (err.response?.data?.detail || err.message), 'error')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleDeleteSession = async (id: string) => {
+    try {
+      await deleteSession(id)
+      setSessions(prev => prev.filter(s => s.id !== id))
+      toast('会话已删除')
+    } catch (e: any) {
+      toast(e.response?.data?.detail || e.message || '删除失败')
     }
   }
 
@@ -313,7 +323,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setDelConfirm({ open: true, id: m.id, title: m.title })}
+                  onClick={() => setDelConfirm({ open: true, id: m.id, title: m.title, type: 'module' })}
                   className="text-xs text-ash-red hover:text-ash-red-bright transition-colors px-2 py-1"
                   title="删除模组"
                 >
@@ -381,25 +391,41 @@ export default function HomePage() {
           <h2 className="text-xl font-display text-cthulhu-gold mb-4">📖 进行中的冒险</h2>
           <div className="grid grid-cols-2 gap-4">
             {sessions.filter(s => s.status === 'active').map(s => (
-              <Link key={s.id} to={`/game/${s.id}`} className="parchment-card hover:border-cthulhu-gold/50 transition-colors">
-                <h3 className="font-display text-parchment-200">会话 {s.id.slice(0, 8)}</h3>
-                <p className="text-xs text-parchment-500">{s.created_at ? new Date(s.created_at).toLocaleString() : ''}</p>
-              </Link>
+              <div key={s.id} className="parchment-card relative group">
+                <Link to={`/game/${s.id}`} className="block hover:border-cthulhu-gold/50 transition-colors">
+                  <h3 className="font-display text-parchment-200">会话 {s.id.slice(0, 8)}</h3>
+                  <p className="text-xs text-parchment-500">{s.created_at ? new Date(s.created_at).toLocaleString() : ''}</p>
+                </Link>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setDelConfirm({ open: true, id: s.id, title: `会话 ${s.id.slice(0, 8)}`, type: 'session' })
+                  }}
+                  className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: 'rgba(180,40,40,0.3)', color: 'var(--color-ash-parchment)' }}
+                >
+                  ✕
+                </button>
+              </div>
             ))}
           </div>
         </section>
       )}
       <ConfirmDialog
         open={delConfirm.open}
-        title="删除模组"
+        title={delConfirm.type === 'module' ? '删除模组' : '删除会话'}
         message={`确定要删除「${delConfirm.title}」吗？此操作不可撤销。`}
         confirmLabel="删除"
         danger
         onConfirm={() => {
-          handleDeleteModule(delConfirm.id)
-          setDelConfirm({ open: false, id: '', title: '' })
+          if (delConfirm.type === 'module') {
+            handleDeleteModule(delConfirm.id)
+          } else {
+            handleDeleteSession(delConfirm.id)
+          }
+          setDelConfirm({ open: false, id: '', title: '', type: 'module' })
         }}
-        onCancel={() => setDelConfirm({ open: false, id: '', title: '' })}
+        onCancel={() => setDelConfirm({ open: false, id: '', title: '', type: 'module' })}
       />
     </div>
   )
