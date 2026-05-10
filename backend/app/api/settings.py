@@ -610,15 +610,37 @@ async def generate_image(
                     status_info = prompt_data.get("status", {})
 
                     # Check for ComfyUI-side errors (bad workflow, missing model, OOM, etc.)
-                    if status_info.get("status_str") == "error":
-                        messages = status_info.get("messages", [])
+                    status_str = status_info.get("status_str", "")
+                    messages = status_info.get("messages", [])
+                    has_error = status_str == "error" or any(
+                        isinstance(m, list) and len(m) >= 2 and m[0] == "execution_error"
+                        for m in messages
+                    )
+                    if has_error:
                         error_details = []
                         for m in messages:
                             if isinstance(m, list) and len(m) >= 2:
-                                error_details.append(f"[{m[0]}] {m[1]}")
+                                mtype, mdata = m[0], m[1]
+                                if mtype == "execution_error":
+                                    if isinstance(mdata, dict):
+                                        exc_msg = mdata.get("exception_message", "")
+                                        exc_type = mdata.get("exception_type", "")
+                                        node_type = mdata.get("node_type", "")
+                                        error_details.append(f"{node_type}: {exc_type}: {exc_msg}")
+                                    else:
+                                        error_details.append(str(mdata))
+                                elif mtype in ("execution_start", "execution_cached"):
+                                    continue  # not errors
+                                else:
+                                    error_details.append(f"[{mtype}] {mdata}")
                             elif isinstance(m, str):
                                 error_details.append(m)
                         detail = "; ".join(error_details) if error_details else "ComfyUI 工作流执行失败，请检查 comfyui_workflow.json 中的模型名称是否正确"
+                        # Add hint for common errors
+                        if "os error 1455" in detail.lower() or "page file" in detail.lower() or "commitment" in detail.lower():
+                            detail += " (提示: Windows 虚拟内存不足，请尝试增大页面文件或使用较小的模型，如 SD 1.5)"
+                        elif "out of memory" in detail.lower() or "oom" in detail.lower():
+                            detail += " (提示: 显存不足，请尝试使用较小的模型或关闭其他占用显存的程序)"
                         raise HTTPException(status_code=502, detail=f"ComfyUI 生成失败: {detail}")
 
                     outputs = prompt_data.get("outputs", {})
