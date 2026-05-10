@@ -87,9 +87,8 @@ export default function CharacterPanel({ show, onClose, character, derivedStats 
 
       {/* Panel */}
       <div
-        className="fixed right-0 top-0 bottom-0 w-80 z-50 overflow-y-auto"
+        className="parchment-card fixed right-0 top-0 bottom-0 w-80 z-50 overflow-y-auto"
         style={{
-          background: 'var(--color-ash-black)',
           borderLeft: '1px solid rgba(197,165,102,0.2)',
           boxShadow: '-8px 0 32px rgba(0,0,0,0.6)',
           transform: closing ? 'translateX(100%)' : 'translateX(0)',
@@ -113,7 +112,7 @@ export default function CharacterPanel({ show, onClose, character, derivedStats 
                 <p
                   className="text-[0.55rem] font-mono mt-0.5 uppercase tracking-wider"
                   style={{
-                    color: character.status === 'alive' ? 'var(--color-ash-gold)' : 'var(--color-ash-red)',
+                    color: character.status === 'alive' ? 'var(--color-ash-dark-brown)' : 'var(--color-ash-red)',
                   }}
                 >
                   {character.status}
@@ -152,7 +151,7 @@ export default function CharacterPanel({ show, onClose, character, derivedStats 
             {stats && (
               <div
                 className="mt-2 pt-2 grid grid-cols-3 gap-1 text-[0.6rem] font-mono"
-                style={{ borderTop: '1px solid rgba(197,165,102,0.1)' }}
+                style={{ borderTop: '1px solid rgba(139,109,69,0.15)' }}
               >
                 <span className="text-ash-parchment-dim">MOV {stats.MOV ?? '—'}</span>
                 <span className="text-ash-parchment-dim">BUILD {stats.BUILD ?? '—'}</span>
