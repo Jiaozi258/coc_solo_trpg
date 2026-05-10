@@ -13,7 +13,8 @@ import MapArea from '../components/MapArea'
 import CharacterPanel from '../components/CharacterPanel'
 import DialogueBox from '../components/DialogueBox'
 import OptionGrid from '../components/OptionGrid'
-import QuestSidebar from '../components/QuestSidebar'
+import DiceLog from '../components/DiceLog'
+import SanEffect from '../components/SanEffect'
 
 export default function GamePage() {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -33,6 +34,8 @@ export default function GamePage() {
   const [pendingDiceRequest, setPendingDiceRequest] = useState<DiceRequest | null>(null)
   const [showTokenUsage, setShowTokenUsage] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [sanShock, setSanShock] = useState(false)
+  const [diceCanvasKey, setDiceCanvasKey] = useState(0)
 
   // Register 【人物】button handler in top bar
   useEffect(() => {
@@ -86,7 +89,15 @@ export default function GamePage() {
         store.setDiceRequest(req)
         setPendingDiceRequest(req)
       },
-      onStatusUpdate: (update) => store.applyStatusUpdate(update),
+      onStatusUpdate: (update) => {
+        const prevSan = store.derivedStats?.SAN_current ?? 0
+        store.applyStatusUpdate(update)
+        const newSan = store.derivedStats?.SAN_current ?? 0
+        if (prevSan - newSan >= 9) {
+          setSanShock(true)
+          setTimeout(() => setSanShock(false), 100)
+        }
+      },
       onDone: () => {
         store.setStreaming(false)
         store.incrementTurn()
@@ -102,12 +113,23 @@ export default function GamePage() {
   const handleDiceRoll = () => {
     if (!pendingDiceRequest) return
     const result = roll(pendingDiceRequest)
+    const check = diceCheck
     const req = pendingDiceRequest
     setPendingDiceRequest(null)
+    setDiceCanvasKey(k => k + 1)
     setTimeout(() => {
       store.setDiceResult(result)
+      if (check) {
+        store.addDiceLog({
+          skill: req.skill,
+          roll: result.total,
+          target: req.value ?? 0,
+          success: check.success,
+          level: check.level,
+        })
+      }
       handleAction(`[Roll: ${result.total} | ${result.individual.join(', ')}]`, result)
-    }, 1500)
+    }, 2200)
   }
 
   const handleTextSubmit = (e: React.FormEvent) => {
@@ -125,7 +147,8 @@ export default function GamePage() {
   }, [store.derivedStats])
 
   return (
-    <div className="flex flex-col flex-1">
+    <div className="flex flex-col flex-1 bg-felt relative">
+      <SanEffect trigger={sanShock} />
       {/* ── Resource Bar ── */}
       <div style={{ borderBottom: '1px solid rgba(197,165,102,0.1)' }}>
         <ResourceBar
@@ -195,24 +218,75 @@ export default function GamePage() {
             onTextSubmit={handleTextSubmit}
             onTextInputChange={setTextInput}
             onToggleTextInput={() => setShowTextInput(!showTextInput)}
+            onDiceResultComplete={() => {}}
+            diceCanvasKey={diceCanvasKey}
           />
         </div>
 
-        {/* Right Sidebar */}
+        {/* Right Sidebar — Collapsible */}
         <div
           className="flex-shrink-0 overflow-y-auto p-3 pl-0"
-          style={{ flex: '1', borderLeft: '1px solid rgba(197,165,102,0.1)' }}
+          style={{ flex: '1', borderLeft: '1px solid rgba(139,109,69,0.1)' }}
         >
-          <QuestSidebar
-            quests={[]}
-            onBeginQuest={(id) => handleAction(`Investigate quest: ${id}`)}
-          />
+          <div className="parchment-card paper-tilt-r p-3 mx-2">
+            <details className="group" open>
+              <summary className="text-[0.65rem] font-display tracking-wider cursor-pointer select-none"
+                       style={{ color: 'var(--color-ash-dark-brown)' }}>
+                角色状态
+              </summary>
+              <div className="mt-2 space-y-1.5 text-[0.6rem] font-mono" style={{ color: 'var(--color-ash-dark-brown)' }}>
+                {character ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span>{character.name}</span>
+                      <span style={{ color: 'rgba(60,40,20,0.4)' }}>{character.occupation}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>HP</span>
+                      <span>{stats.HP_current ?? 0} / {stats.HP_max ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>SAN</span>
+                      <span>{stats.SAN_current ?? 0} / {stats.SAN_max ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>MP</span>
+                      <span>{stats.MP_current ?? 0} / {stats.MP_max ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>MOV / DODGE</span>
+                      <span>{stats.MOV ?? 0} / {stats.DODGE ?? 0}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs italic" style={{ color: 'rgba(197,165,102,0.35)' }}>Loading...</p>
+                )}
+              </div>
+            </details>
+          </div>
 
-          {/* Timeline + Exit buttons */}
+          <div className="parchment-card paper-tilt-r p-3 mx-2 mt-2">
+            <details open>
+              <summary className="text-[0.65rem] font-display tracking-wider cursor-pointer select-none"
+                       style={{ color: 'var(--color-ash-dark-brown)' }}>
+                骰子日志
+              </summary>
+              <div className="mt-2">
+                <DiceLog entries={store.diceLog} />
+              </div>
+            </details>
+          </div>
+
+          {/* Timeline + Exit */}
           <div className="flex gap-2 mt-3 justify-center">
             <button
               onClick={() => navigate('/')}
-              className="ash-btn text-[0.6rem]"
+              className="text-[0.6rem] font-display tracking-wider px-4 py-1.5 rounded"
+              style={{
+                background: 'rgba(139,69,19,0.15)',
+                border: '1px solid rgba(139,69,19,0.2)',
+                color: 'var(--color-ash-dark-brown)',
+              }}
             >
               Leave Table
             </button>
