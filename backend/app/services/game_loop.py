@@ -173,21 +173,23 @@ class GameLoop:
                 clean = clean.split("```")[1].split("```")[0].strip()
             parsed = json.loads(clean)
             if not isinstance(parsed, dict):
+                fallback_narrative = self._extract_partial_narrative(json_buffer) or self._unescape_json_string(json_buffer)
                 parsed = {
-                    "narrative": json_buffer,
+                    "narrative": fallback_narrative,
                     "options": ["继续探索", "仔细观察", "与NPC交谈", "查阅资料"],
                     "dice_request": None,
                     "status_update": None,
                 }
         except json.JSONDecodeError:
+            fallback_narrative = self._extract_partial_narrative(json_buffer) or self._unescape_json_string(json_buffer)
             parsed = {
-                "narrative": json_buffer,
+                "narrative": fallback_narrative,
                 "options": ["继续探索", "仔细观察", "与NPC交谈", "查阅资料"],
                 "dice_request": None,
                 "status_update": None,
             }
 
-        final_narrative = parsed.get("narrative", json_buffer)
+        final_narrative = parsed.get("narrative") or ""
         yield ("narrative", {"text": final_narrative, "final": True})
         yield ("options", {"options": parsed.get("options", [])})
 
@@ -200,6 +202,10 @@ class GameLoop:
             yield ("status_update", status_update)
 
         yield ("done", {"turn_complete": True})
+
+    def _unescape_json_string(self, s: str) -> str:
+        """Decode JSON string escape sequences (\\n → newline, \\\" → \", \\\\ → \\)."""
+        return s.replace('\\\\', '\\').replace('\\n', '\n').replace('\\"', '"').replace('\\r', '\r').replace('\\t', '\t')
 
     def _extract_partial_narrative(self, buffer: str) -> str:
         """Extract narrative text from partial JSON buffer for streaming."""
@@ -225,6 +231,4 @@ class GameLoop:
         # Remove trailing partial unicode
         if raw.endswith("\\"):
             raw = raw[:-1]
-        # Unescape common JSON escape sequences for display
-        raw = raw.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
-        return raw
+        return self._unescape_json_string(raw)
