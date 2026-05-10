@@ -108,6 +108,25 @@ export const COC_OCCUPATIONS: COCOccupation[] = [
   { name: '神职人员', skills: ['说服', '心理学', '母语', '神秘学'], credit_rating: [10, 50] },
   { name: '罪犯', skills: ['潜行', '巧手', '格斗', '侦查'], credit_rating: [10, 50] },
   { name: '艺术家', skills: ['艺术', '侦查', '心理学', '母语'], credit_rating: [10, 50] },
+  { name: '律师', skills: ['法律', '图书馆使用', '快速交谈', '心理学'], credit_rating: [30, 70] },
+  { name: '工程师', skills: ['电气维修', '机械维修', '科学', '图书馆使用'], credit_rating: [30, 70] },
+  { name: '护士', skills: ['急救', '医学', '心理学', '聆听'], credit_rating: [20, 60] },
+  { name: '士兵', skills: ['格斗', '枪械', '生存', '闪避'], credit_rating: [10, 50] },
+  { name: '飞行员', skills: ['导航', '驾驶', '机械维修', '科学'], credit_rating: [30, 70] },
+  { name: '科学家', skills: ['科学', '图书馆使用', '计算机使用', '自然世界'], credit_rating: [30, 70] },
+  { name: '出租车司机', skills: ['汽车驾驶', '导航', '侦查', '机械维修'], credit_rating: [10, 40] },
+  { name: '农民', skills: ['自然世界', '生存', '机械维修', '重型机械'], credit_rating: [10, 30] },
+  { name: '猎人', skills: ['枪械', '追踪', '生存', '潜行'], credit_rating: [10, 30] },
+  { name: '水手', skills: ['导航', '游泳', '攀爬', '自然世界'], credit_rating: [10, 40] },
+  { name: '音乐家', skills: ['艺术', '聆听', '心理学', '一项社交技能'], credit_rating: [10, 50] },
+  { name: '摄影师', skills: ['艺术', '侦查', '图书馆使用', '聆听'], credit_rating: [10, 50] },
+  { name: '翻译', skills: ['母语', '心理学', '图书馆使用', '历史'], credit_rating: [20, 60] },
+  { name: '保镖', skills: ['格斗', '侦查', '聆听', '闪避'], credit_rating: [20, 60] },
+  { name: '服务员', skills: ['闪避', '聆听', '侦查', '一项社交技能'], credit_rating: [10, 30] },
+  { name: '伐木工', skills: ['格斗', '攀爬', '自然世界', '跳跃'], credit_rating: [10, 30] },
+  { name: '矿工', skills: ['攀爬', '重型机械', '生存', '跳跃'], credit_rating: [10, 30] },
+  { name: '赛车手', skills: ['汽车驾驶', '机械维修', '闪避', '快速交谈'], credit_rating: [20, 60] },
+  { name: '化学家', skills: ['科学', '医学', '图书馆使用', '一项社交技能'], credit_rating: [30, 70] },
 ]
 
 export interface LocationNode {
@@ -212,4 +231,13 @@ export interface TokenUsage {
   input_tokens: number
   output_tokens: number
   total_tokens: number
+}
+
+export interface DiceLogEntry {
+  skill?: string
+  roll: number
+  target: number
+  success: boolean
+  level: string
+  timestamp: number
 }
